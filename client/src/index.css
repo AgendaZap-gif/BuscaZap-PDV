@@ -174,4 +174,53 @@
       max-width: 1280px; /* Standard content width */
     }
   }
+
+  /* PDV specific styles */
+  .table-card {
+    @apply transition-all duration-200 hover:shadow-lg cursor-pointer;
+  }
+
+  .table-card.available {
+    @apply bg-green-50 border-green-200 hover:border-green-400;
+  }
+
+  .table-card.occupied {
+    @apply bg-red-50 border-red-200 hover:border-red-400;
+  }
+
+  .table-card.reserved {
+    @apply bg-yellow-50 border-yellow-200 hover:border-yellow-400;
+  }
+
+  .order-item {
+    @apply transition-colors duration-150;
+  }
+
+  .order-item.pending {
+    @apply bg-gray-50;
+  }
+
+  .order-item.preparing {
+    @apply bg-blue-50;
+  }
+
+  .order-item.ready {
+    @apply bg-green-50;
+  }
+
+  .kitchen-card {
+    @apply border-l-4 transition-all duration-200;
+  }
+
+  .kitchen-card.pending {
+    @apply border-l-orange-500 bg-orange-50;
+  }
+
+  .kitchen-card.preparing {
+    @apply border-l-blue-500 bg-blue-50;
+  }
+
+  .kitchen-card.ready {
+    @apply border-l-green-500 bg-green-50;
+  }
 }
