@@ -2,8 +2,9 @@
 
 ## 🎯 Funcionalidades Principais
 
-### 1. Sistema de Autenticação e Perfis
-- [ ] Login multiempresa
+### 1. Autenticação e Multiempresa
+- [x] Backend: Login de usuário
+- [ ] Frontend: Tela de loginempresa
 - [ ] Perfis de acesso (Garçom, Caixa, Gerente, Admin)
 - [ ] Seleção de empresa ao fazer login
 
