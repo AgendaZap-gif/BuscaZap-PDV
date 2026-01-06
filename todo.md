@@ -4,30 +4,30 @@
 
 ### 1. Autenticação e Multiempresa
 - [x] Backend: Login de usuário
-- [ ] Frontend: Tela de loginempresa
+- [x] Frontend: Tela de login
 - [ ] Perfis de acesso (Garçom, Caixa, Gerente, Admin)
-- [ ] Seleção de empresa ao fazer login
+- [x] Seleção de empresa ao fazer login
 
 ### 2. Gestão de Mesas e Comandas
-- [ ] Visualização de mesas (disponível, ocupada, reservada)
-- [ ] Abertura de comanda por mesa
+- [x] Visualização de mesas (disponível, ocupada, reservada)
+- [x] Abertura de comanda por mesa
 - [ ] Transferência de itens entre mesas
 - [ ] Junção de mesas
 - [ ] Divisão de conta entre pessoas
 
 ### 3. Modo Garçom (Mobile/Tablet)
-- [ ] Interface otimizada para celular/tablet
-- [ ] Listagem de produtos por categoria (texto apenas)
-- [ ] Adicionar itens à comanda
-- [ ] Observações por item
+- [x] Interface otimizada para celular/tablet
+- [x] Listagem de produtos por categoria (texto apenas)
+- [x] Adicionar itens à comanda
+- [x] Observações por item
 - [ ] Enviar pedido para cozinha
 
 ### 4. Tela de Cozinha (KDS - Kitchen Display System)
-- [ ] Visualização de pedidos pendentes
-- [ ] Organização por setor (cozinha, bar, etc.)
-- [ ] Marcar item como pronto
+- [x] Visualização de pedidos pendentes
+- [x] Organização por setor (cozinha, bar, etc.)
+- [x] Marcar item como pronto
 - [ ] Alertas de tempo de preparo
-- [ ] Filtro por status (pendente, em preparo, pronto)
+- [x] Filtro por status (pendente, em preparo, pronto)
 
 ### 5. PDV Caixa
 - [ ] Abertura de caixa
@@ -70,9 +70,9 @@
 - [ ] Indicador de status de conexão
 
 ### 11. Gestão de Produtos
-- [ ] Cadastro de produtos
-- [ ] Categorias de produtos
-- [ ] Preços e variações
+- [x] Cadastro de produtos
+- [x] Categorias de produtos
+- [x] Preços e variações
 - [ ] Controle de estoque (opcional)
 
 ### 12. Configurações
@@ -131,16 +131,17 @@
 ## 🎨 Interface
 
 ### Telas Principais
-- [ ] Login
-- [ ] Seleção de Empresa
-- [ ] Dashboard
-- [ ] Mesas (grid view)
-- [ ] Comanda (detalhes)
-- [ ] Cardápio (modo garçom)
-- [ ] Cozinha (KDS)
+- [x] Login
+- [x] Seleção de Empresa
+- [x] Dashboard (Home)
+- [x] Mesas (grid view)
+- [x] Comanda (detalhes)
+- [x] Cardápio (modo garçom)
+- [x] Cozinha (KDS)
 - [ ] Caixa (PDV)
 - [ ] Fechamento
 - [ ] Relatórios
+- [x] Produtos (gestão)
 - [ ] Configurações
 
 ## 🚀 Tecnologias
@@ -170,3 +171,23 @@
 - [ ] Sincronizar produtos entre app e PDV
 - [ ] Receber pedidos do delivery no PDV
 - [ ] Atualizar status de pedidos no app
+
+## 🍔 Gestão de Produtos (Sincronização PDV ↔ App)
+
+
+### Funcionalidades Principais
+- [x] Página de gestão de produtos no PDV
+- [x] Upload de foto do produto (S3)
+- [x] CRUD completo (criar, editar, excluir)
+- [x] Campos: nome, descrição, valor, categoria, foto
+- [x] Sincronização bidirecional PDV ↔ App PediJá
+- [x] Mesma tabela `products` compartilhada
+- [x] Botão de Produtos na tela inicial
+- [x] Modal de adicionar produtos na comanda
+
+### Visualizações por Perfil
+- [x] **Garçom:** Modal com busca e seleção de produtos
+- [ ] **Caixa/PDV:** Cards grandes igual no app
+- [x] **App PediJá:** Usa os mesmos produtos
+- [x] Busca e filtro por categoria
+- [ ] Ordenação por nome/preço

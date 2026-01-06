@@ -83,6 +83,10 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return await db.getCategoriesByCompany(input.companyId);
       }),
+    getAll: protectedProcedure.query(async () => {
+      const companyId = 1; // TODO: Get from ctx.user.companyId
+      return await db.getCategoriesByCompany(companyId);
+    }),
   }),
 
   // ==================== PRODUCTS ====================
@@ -92,10 +96,72 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return await db.getProductsByCompany(input.companyId);
       }),
+    getAll: protectedProcedure
+      .input(z.object({ includeInactive: z.boolean().optional() }))
+      .query(async ({ ctx, input }) => {
+        // Get company from context or first company
+        const companyId = 1; // TODO: Get from ctx.user.companyId
+        return await db.getAllProductsByCompany(companyId, input.includeInactive);
+      }),
     listByCategory: protectedProcedure
       .input(z.object({ companyId: z.number(), categoryId: z.number() }))
       .query(async ({ input }) => {
         return await db.getProductsByCategory(input.companyId, input.categoryId);
+      }),
+    create: protectedProcedure
+      .input(
+        z.object({
+          name: z.string(),
+          description: z.string().optional(),
+          price: z.number(),
+          categoryId: z.number(),
+          image: z.string().optional(),
+          productionSector: z.string().optional(),
+          preparationTime: z.number().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const companyId = 1; // TODO: Get from ctx.user.companyId
+        const id = await db.createProduct({
+          companyId,
+          name: input.name,
+          price: input.price.toFixed(2),
+          categoryId: input.categoryId || null,
+          description: input.description || null,
+          image: input.image || null,
+          isActive: true,
+          productionSector: input.productionSector || null,
+          preparationTime: input.preparationTime || 15,
+        });
+        return { id };
+      }),
+    update: protectedProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().optional(),
+          description: z.string().optional(),
+          price: z.number().optional(),
+          categoryId: z.number().optional(),
+          image: z.string().optional(),
+          productionSector: z.string().optional(),
+          preparationTime: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        const updateData: any = { ...data };
+        if (data.price !== undefined) {
+          updateData.price = data.price.toFixed(2);
+        }
+        await db.updateProduct(id, updateData);
+        return { success: true };
+      }),
+    delete: protectedProcedure
+      .input(z.number())
+      .mutation(async ({ input }) => {
+        await db.deleteProduct(input);
+        return { success: true };
       }),
   }),
 

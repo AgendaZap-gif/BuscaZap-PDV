@@ -13,6 +13,7 @@ import SelectCompany from "./pages/SelectCompany";
 import Cashier from "./pages/Cashier";
 import CashRegister from "./pages/CashRegister";
 import Reports from "./pages/Reports";
+import Products from "./pages/Products";
 
 function Router() {
   return (
@@ -22,7 +23,8 @@ function Router() {
       <Route path="/order/:id" component={Order} />
       <Route path="/waiter" component={Waiter} />
       <Route path="/kitchen" component={Kitchen} />
-       <Route path="/select-company" component={SelectCompany} />
+      <Route path="/products" component={Products} />
+      <Route path="/select-company" component={SelectCompany} />
       <Route path={"/cashier"} component={Cashier} />
       <Route path={"/cash-register"} component={CashRegister} />
       <Route path={"/reports"} component={Reports} />

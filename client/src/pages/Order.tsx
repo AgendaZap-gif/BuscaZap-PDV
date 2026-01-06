@@ -5,11 +5,14 @@ import { trpc } from "@/lib/trpc";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
+import AddProductDialog from "@/components/AddProductDialog";
+import { useState } from "react";
 
 export default function Order() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const orderId = parseInt(id || "0");
+  const [showAddProduct, setShowAddProduct] = useState(false);
 
   const { data: order, isLoading } = trpc.orders.getById.useQuery({ orderId });
   const { data: items } = trpc.orderItems.list.useQuery({ orderId });
@@ -33,7 +36,7 @@ export default function Order() {
               <p className="text-sm text-muted-foreground">Mesa {order?.tableId}</p>
             </div>
           </div>
-          <Button>
+          <Button onClick={() => setShowAddProduct(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Adicionar Item
           </Button>
@@ -43,22 +46,31 @@ export default function Order() {
       <div className="container py-8">
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
-            {items?.map((item) => (
-              <Card key={item.id}>
-                <CardContent className="py-4 flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold">{item.quantity}x Produto</div>
-                    <div className="text-sm text-muted-foreground">R$ {item.unitPrice}</div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-lg font-bold">R$ {item.subtotal}</div>
-                    <Button variant="ghost" size="icon">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {items && items.length > 0 ? (
+              items.map((item) => (
+                <Card key={item.id}>
+                  <CardContent className="py-4 flex items-center justify-between">
+                    <div>
+                      <div className="font-semibold">{item.quantity}x Produto #{item.productId}</div>
+                      <div className="text-sm text-muted-foreground">R$ {item.unitPrice}</div>
+                      {item.notes && (
+                        <div className="text-xs text-muted-foreground mt-1">{item.notes}</div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-lg font-bold">R$ {item.subtotal}</div>
+                      <Button variant="ghost" size="icon">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhum item adicionado ainda. Clique em "Adicionar Item" para começar.
+              </div>
+            )}
           </div>
 
           <div>
@@ -81,6 +93,12 @@ export default function Order() {
           </div>
         </div>
       </div>
+
+      <AddProductDialog
+        open={showAddProduct}
+        onOpenChange={setShowAddProduct}
+        orderId={orderId}
+      />
     </div>
   );
 }

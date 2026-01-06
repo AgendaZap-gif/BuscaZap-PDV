@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLoginUrl } from "@/const";
-import { ChefHat, CreditCard, LayoutGrid, TrendingUp, UtensilsCrossed } from "lucide-react";
+import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Home() {
@@ -83,6 +83,13 @@ export default function Home() {
       icon: TrendingUp,
       path: "/reports",
       color: "bg-red-500",
+    },
+    {
+      title: "Produtos",
+      description: "Gerenciar cardápio e produtos",
+      icon: Package,
+      path: "/products",
+      color: "bg-indigo-500",
     },
   ];
 

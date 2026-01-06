@@ -542,3 +542,51 @@ export async function getDeliveryRequestById(requestId: number) {
 
   return result[0];
 }
+
+
+// ==================== PRODUCTS CRUD ====================
+
+export async function createProduct(data: Omit<Product, "id" | "createdAt" | "updatedAt">) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(products).values(data);
+  return result[0].insertId;
+}
+
+export async function updateProduct(productId: number, data: Partial<Product>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(products).set(data).where(eq(products.id, productId));
+}
+
+export async function deleteProduct(productId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Soft delete
+  await db.update(products).set({ isActive: false }).where(eq(products.id, productId));
+}
+
+export async function getProductById(productId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.select().from(products).where(eq(products.id, productId)).limit(1);
+  return result[0];
+}
+
+export async function getAllProductsByCompany(companyId: number, includeInactive = false) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (includeInactive) {
+    return await db.select().from(products).where(eq(products.companyId, companyId));
+  }
+
+  return await db
+    .select()
+    .from(products)
+    .where(and(eq(products.companyId, companyId), eq(products.isActive, true)));
+}
