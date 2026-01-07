@@ -1,4 +1,4 @@
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, isNull, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -13,6 +13,7 @@ import {
   payments,
   cashRegisters,
   cashMovements,
+  cashClosures,
   printers,
   billSplits,
   deliveryRequests,
@@ -336,83 +337,6 @@ export async function getPaymentsByOrder(orderId: number) {
   return await db.select().from(payments).where(eq(payments.orderId, orderId));
 }
 
-// ==================== CASH REGISTER ====================
-
-export async function openCashRegister(
-  data: Omit<CashRegister, "id" | "openedAt" | "closedAt">
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(cashRegisters).values(data);
-  return result[0].insertId;
-}
-
-export async function getActiveCashRegister(companyId: number, userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db
-    .select()
-    .from(cashRegisters)
-    .where(
-      and(
-        eq(cashRegisters.companyId, companyId),
-        eq(cashRegisters.userId, userId),
-        eq(cashRegisters.status, "open")
-      )
-    )
-    .limit(1);
-
-  return result[0];
-}
-
-export async function closeCashRegister(
-  registerId: number,
-  closingAmount: string,
-  expectedAmount: string,
-  difference: string,
-  notes?: string
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db
-    .update(cashRegisters)
-    .set({
-      status: "closed",
-      closingAmount,
-      expectedAmount,
-      difference,
-      notes,
-      closedAt: new Date(),
-    })
-    .where(eq(cashRegisters.id, registerId));
-}
-
-// ==================== CASH MOVEMENTS ====================
-
-export async function addCashMovement(
-  data: Omit<typeof cashMovements.$inferInsert, "id" | "createdAt">
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(cashMovements).values(data);
-  return result[0].insertId;
-}
-
-export async function getCashMovements(registerId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  return await db
-    .select()
-    .from(cashMovements)
-    .where(eq(cashMovements.cashRegisterId, registerId));
-}
-
-// ==================== BILL SPLITS ====================
 
 export async function createBillSplit(
   orderId: number,
@@ -589,4 +513,215 @@ export async function getAllProductsByCompany(companyId: number, includeInactive
     .select()
     .from(products)
     .where(and(eq(products.companyId, companyId), eq(products.isActive, true)));
+}
+
+
+// ==================== CASH REGISTER ====================
+
+export async function openCashRegister(data: {
+  companyId: number;
+  userId: number;
+  openingAmount: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Verificar se já existe caixa aberto para este usuário
+  const openRegister = await db
+    .select()
+    .from(cashRegisters)
+    .where(and(eq(cashRegisters.userId, data.userId), eq(cashRegisters.status, "open")))
+    .limit(1);
+
+  if (openRegister.length > 0) {
+    throw new Error("Já existe um caixa aberto para este usuário");
+  }
+
+  const result = await db.insert(cashRegisters).values({
+    companyId: data.companyId,
+    userId: data.userId,
+    openingAmount: data.openingAmount.toString(),
+    status: "open",
+  });
+
+  return result[0].insertId;
+}
+
+export async function getOpenCashRegister(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(cashRegisters)
+    .where(and(eq(cashRegisters.userId, userId), eq(cashRegisters.status, "open")))
+    .limit(1);
+
+  return result[0] || null;
+}
+
+export async function addCashMovement(data: {
+  cashRegisterId: number;
+  type: "withdrawal" | "deposit";
+  amount: number;
+  reason: string;
+  userId: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.insert(cashMovements).values({
+    cashRegisterId: data.cashRegisterId,
+    type: data.type,
+    amount: data.amount.toString(),
+    reason: data.reason,
+    userId: data.userId,
+  });
+
+  return result[0].insertId;
+}
+
+export async function getCashMovements(cashRegisterId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(cashMovements)
+    .where(eq(cashMovements.cashRegisterId, cashRegisterId));
+}
+
+export async function closeCashRegister(data: {
+  cashRegisterId: number;
+  closingAmount: number;
+  expectedAmount: number;
+  notes?: string;
+  closureDetails: Array<{
+    paymentMethodId: number;
+    expectedAmount: number;
+    countedAmount: number;
+  }>;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const difference = data.closingAmount - data.expectedAmount;
+
+  // Atualizar o registro de caixa
+  await db
+    .update(cashRegisters)
+    .set({
+      closingAmount: data.closingAmount.toString(),
+      expectedAmount: data.expectedAmount.toString(),
+      difference: difference.toString(),
+      status: "closed",
+      notes: data.notes,
+      closedAt: new Date(),
+    })
+    .where(eq(cashRegisters.id, data.cashRegisterId));
+
+  // Inserir detalhes de fechamento por meio de pagamento
+  for (const detail of data.closureDetails) {
+    await db.insert(cashClosures).values({
+      cashRegisterId: data.cashRegisterId,
+      paymentMethodId: detail.paymentMethodId,
+      expectedAmount: detail.expectedAmount.toString(),
+      countedAmount: detail.countedAmount.toString(),
+      difference: (detail.countedAmount - detail.expectedAmount).toString(),
+    });
+  }
+
+  return { success: true, difference };
+}
+
+export async function getCashRegisterSummary(cashRegisterId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Buscar registro de caixa
+  const register = await db
+    .select()
+    .from(cashRegisters)
+    .where(eq(cashRegisters.id, cashRegisterId))
+    .limit(1);
+
+  if (!register[0]) {
+    throw new Error("Caixa não encontrado");
+  }
+
+  // Buscar todos os pagamentos do caixa (pedidos fechados durante o período)
+  const paymentsData = await db
+    .select({
+      paymentMethodId: payments.paymentMethodId,
+      amount: payments.amount,
+      paymentMethodName: paymentMethods.name,
+      paymentMethodType: paymentMethods.type,
+    })
+    .from(payments)
+    .innerJoin(orders, eq(payments.orderId, orders.id))
+    .innerJoin(paymentMethods, eq(payments.paymentMethodId, paymentMethods.id))
+    .where(
+      and(
+        eq(orders.companyId, register[0].companyId),
+        gte(orders.closedAt, register[0].openedAt),
+        register[0].closedAt ? lte(orders.closedAt, register[0].closedAt) : undefined
+      )
+    );
+
+  // Agrupar por método de pagamento
+  const paymentsByMethod = paymentsData.reduce((acc, payment) => {
+    const key = payment.paymentMethodId;
+    if (!acc[key]) {
+      acc[key] = {
+        paymentMethodId: payment.paymentMethodId,
+        paymentMethodName: payment.paymentMethodName,
+        paymentMethodType: payment.paymentMethodType,
+        total: 0,
+      };
+    }
+    acc[key].total += parseFloat(payment.amount);
+    return acc;
+  }, {} as Record<number, any>);
+
+  // Buscar movimentações de caixa
+  const movements = await getCashMovements(cashRegisterId);
+
+  // Calcular totais
+  const totalWithdrawals = movements
+    .filter((m) => m.type === "withdrawal")
+    .reduce((sum, m) => sum + parseFloat(m.amount), 0);
+
+  const totalDeposits = movements
+    .filter((m) => m.type === "deposit")
+    .reduce((sum, m) => sum + parseFloat(m.amount), 0);
+
+  const totalSales = Object.values(paymentsByMethod).reduce(
+    (sum: number, method: any) => sum + method.total,
+    0
+  );
+
+  const expectedAmount =
+    parseFloat(register[0].openingAmount) + totalSales + totalDeposits - totalWithdrawals;
+
+  return {
+    register: register[0],
+    paymentsByMethod: Object.values(paymentsByMethod),
+    movements,
+    totalSales,
+    totalWithdrawals,
+    totalDeposits,
+    expectedAmount,
+  };
+}
+
+export async function getCashRegisterHistory(companyId: number, limit = 10) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(cashRegisters)
+    .where(eq(cashRegisters.companyId, companyId))
+    .orderBy(desc(cashRegisters.openedAt))
+    .limit(limit);
 }

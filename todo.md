@@ -191,3 +191,34 @@
 - [x] **App PediJá:** Usa os mesmos produtos
 - [x] Busca e filtro por categoria
 - [ ] Ordenação por nome/preço
+
+
+## 🔄 Novas Funcionalidades em Desenvolvimento
+
+### Fechamento de Caixa Completo
+- [x] Schema de banco: cashRegisters, cashMovements, cashClosures
+- [x] Backend: Rotas de abertura, movimentação e fechamento
+- [x] Frontend: Tela de abertura de caixa
+- [x] Frontend: Registro de vendas no caixa
+- [x] Frontend: Múltiplos meios de pagamento
+- [x] Frontend: Sangria e reforço de caixa
+- [x] Frontend: Fechamento com relatório de conferência
+- [ ] Testes unitários
+
+### Divisão de Conta
+- [ ] Schema de banco: orderSplits
+- [ ] Backend: Rotas de divisão de conta
+- [ ] Frontend: Modal de divisão de conta
+- [ ] Frontend: Divisão igual entre pessoas
+- [ ] Frontend: Divisão por itens específicos
+- [ ] Frontend: Geração de múltiplos pagamentos
+- [ ] Testes unitários
+
+### Dashboard de Relatórios
+- [ ] Backend: Queries de análise de vendas
+- [ ] Frontend: Gráfico de vendas por período
+- [ ] Frontend: Produtos mais vendidos
+- [ ] Frontend: Faturamento por categoria
+- [ ] Frontend: Ticket médio
+- [ ] Frontend: Filtros de data e período
+- [ ] Testes unitários

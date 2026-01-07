@@ -213,6 +213,22 @@ export type CashMovement = typeof cashMovements.$inferSelect;
 export type InsertCashMovement = typeof cashMovements.$inferInsert;
 
 /**
+ * Cash Closures - Detalhes de fechamento de caixa
+ */
+export const cashClosures = mysqlTable("cash_closures", {
+  id: int("id").autoincrement().primaryKey(),
+  cashRegisterId: int("cashRegisterId").notNull(),
+  paymentMethodId: int("paymentMethodId").notNull(),
+  expectedAmount: decimal("expectedAmount", { precision: 10, scale: 2 }).notNull(),
+  countedAmount: decimal("countedAmount", { precision: 10, scale: 2 }).notNull(),
+  difference: decimal("difference", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CashClosure = typeof cashClosures.$inferSelect;
+export type InsertCashClosure = typeof cashClosures.$inferInsert;
+
+/**
  * Printers - Impressoras configuradas
  */
 export const printers = mysqlTable("printers", {

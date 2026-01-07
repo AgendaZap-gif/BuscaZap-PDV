@@ -322,19 +322,14 @@ export const appRouter = router({
         const id = await db.openCashRegister({
           companyId: input.companyId,
           userId: ctx.user.id,
-          openingAmount: input.openingAmount,
-          closingAmount: null,
-          expectedAmount: null,
-          difference: null,
-          status: "open",
-          notes: input.notes || null,
+          openingAmount: parseFloat(input.openingAmount),
         });
         return { id };
       }),
     getActive: protectedProcedure
       .input(z.object({ companyId: z.number() }))
       .query(async ({ ctx, input }) => {
-        return await db.getActiveCashRegister(input.companyId, ctx.user.id);
+        return await db.getOpenCashRegister(ctx.user.id);
       }),
     close: protectedProcedure
       .input(
@@ -347,14 +342,19 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        await db.closeCashRegister(
-          input.registerId,
-          input.closingAmount,
-          input.expectedAmount,
-          input.difference,
-          input.notes
-        );
-        return { success: true };
+        const result = await db.closeCashRegister({
+          cashRegisterId: input.registerId,
+          closingAmount: parseFloat(input.closingAmount),
+          expectedAmount: parseFloat(input.expectedAmount),
+          notes: input.notes,
+          closureDetails: [], // Será preenchido pelo frontend
+        });
+        return result;
+      }),
+    getSummary: protectedProcedure
+      .input(z.object({ registerId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getCashRegisterSummary(input.registerId);
       }),
   }),
 
@@ -373,7 +373,7 @@ export const appRouter = router({
         const id = await db.addCashMovement({
           cashRegisterId: input.cashRegisterId,
           type: input.type,
-          amount: input.amount,
+          amount: parseFloat(input.amount),
           reason: input.reason,
           userId: ctx.user.id,
         });
