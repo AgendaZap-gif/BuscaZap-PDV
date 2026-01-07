@@ -482,7 +482,243 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return await db.getDeliveryRequestById(input.requestId);
       }),
+   }),
+
+  // Notificações
+  notifications: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return [] as Array<{
+        id: string;
+        title: string;
+        message: string;
+        type: 'order' | 'delivery' | 'promotion' | 'system';
+        read: boolean;
+        createdAt: Date;
+        data?: Record<string, any>;
+      }>;
+    }),
+    markAsRead: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .mutation(async ({ input }) => {
+        return { success: true };
+      }),
+    markAllAsRead: protectedProcedure.mutation(async ({ ctx }) => {
+      return { success: true };
+      }),
+    getSettings: protectedProcedure.query(async ({ ctx }) => {
+      return {
+        pushEnabled: true,
+        emailEnabled: true,
+        orderUpdates: true,
+        promotions: true,
+      };
+    }),
+    updateSettings: protectedProcedure
+      .input(
+        z.object({
+          pushEnabled: z.boolean().optional(),
+          emailEnabled: z.boolean().optional(),
+          orderUpdates: z.boolean().optional(),
+          promotions: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return { success: true };
+      }),
+  }),
+
+  // Cupons
+  coupons: router({
+    myAvailable: protectedProcedure.query(async ({ ctx }) => {
+      return [] as Array<{
+        id: number;
+        code: string;
+        type: 'percentage' | 'fixed';
+        value: number;
+        description: string;
+        minOrderValue: number | null;
+        validUntil: Date;
+        usageLimit: number | null;
+        usageCount: number;
+        isActive: boolean;
+      }>;
+    }),
+  }),
+
+  // Programa de Fidelidade
+  loyalty: router({
+    getPoints: protectedProcedure.query(async ({ ctx }) => {
+      return {
+        points: 0,
+        level: 'bronze',
+        nextLevelPoints: 100,
+      };
+    }),
+    getMyPoints: protectedProcedure.query(async ({ ctx }) => {
+      return {
+        points: 0,
+        level: 'bronze',
+        nextLevelPoints: 100,
+      };
+    }),
+    getHistory: protectedProcedure.query(async ({ ctx }) => {
+      return [] as Array<{
+        id: number;
+        points: number;
+        type: 'earned' | 'redeemed';
+        description: string;
+        createdAt: Date;
+      }>;
+    }),
+    addPoints: protectedProcedure
+      .input(z.object({ points: z.number(), orderId: z.string() }))
+      .mutation(async ({ input }) => {
+        return { success: true, newTotal: input.points };
+      }),
+  }),
+
+  // Mensagens/Chat
+  messages: router({
+    list: protectedProcedure
+      .input(z.object({ conversationId: z.string() }))
+      .query(async ({ input }) => {
+        return [];
+      }),
+    send: protectedProcedure
+      .input(
+        z.object({
+          conversationId: z.string(),
+          content: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return { success: true, messageId: 'temp-id' };
+      }),
+  }),
+
+  // Avaliações
+  reviews: router({
+    list: protectedProcedure
+      .input(z.object({ companyId: z.string() }))
+      .query(async ({ input }) => {
+        return [];
+      }),
+    create: protectedProcedure
+      .input(
+        z.object({
+          orderId: z.string(),
+          rating: z.number().min(1).max(5),
+          comment: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return { success: true };
+      }),
+  }),
+
+  // Analytics
+  analytics: router({
+    track: protectedProcedure
+      .input(
+        z.object({
+          event: z.string(),
+          properties: z.record(z.string(), z.any()).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return { success: true };
+      }),
+    getCompanyStats: protectedProcedure
+      .input(z.object({ period: z.enum(['day', 'week', 'month', 'year']) }))
+      .query(async ({ input }) => {
+        return {
+          revenue: 0,
+          revenueTrend: 0,
+          orders: 0,
+          totalOrders: 0,
+          ordersTrend: 0,
+          customers: 0,
+          newCustomers: 0,
+          newCustomersTrend: 0,
+          averageTicket: 0,
+          averageRating: 0,
+          totalReviews: 0,
+          topProducts: [] as Array<{ id: number; name: string; quantity: number; revenue: number }>,
+          recentOrders: [] as Array<{ id: number; customerName: string; total: number; status: string; createdAt: Date }>,
+          salesByPeriod: [] as Array<{ period: string; revenue: number; orders: number; label: string; value: number }>,
+          peakHours: [] as Array<{ hour: number; orders: number }>,
+          ordersByStatus: [] as Array<{ status: string; count: number; percentage: number }>,
+        };
+      }),
+  }),
+
+  // Conversas/Chat
+  conversations: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return [] as Array<{
+        id: number;
+        otherParticipantName: string;
+        otherParticipantAvatar: string | null;
+        lastMessage: string;
+        lastMessageTime: Date;
+        unreadCount: number;
+      }>;
+    }),
+    getById: protectedProcedure
+      .input(z.object({ id: z.string() }))
+      .query(async ({ input }) => {
+        return null;
+      }),
+  }),
+
+  // Saques (para entregadores)
+  withdrawals: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return [];
+    }),
+    create: protectedProcedure
+      .input(
+        z.object({
+          amount: z.number(),
+          bankAccountId: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return { success: true, withdrawalId: 'temp-id' };
+      }),
+    getBalance: protectedProcedure.query(async ({ ctx }) => {
+      return { available: 0, pending: 0, total: 0 };
+    }),
+  }),
+
+  // Contas bancárias
+  bankAccounts: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      return [];
+    }),
+    create: protectedProcedure
+      .input(
+        z.object({
+          bankName: z.string(),
+          accountType: z.enum(['checking', 'savings']),
+          accountNumber: z.string(),
+          agency: z.string(),
+          holderName: z.string(),
+          holderDocument: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return { success: true, accountId: 'temp-id' };
+      }),
+  }),
+
+  // Usuários
+  users: router({
+    updatePushToken: protectedProcedure
+      .input(z.object({ token: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        return { success: true };
+      }),
   }),
 });
-
 export type AppRouter = typeof appRouter;
