@@ -118,6 +118,7 @@ export const orders = mysqlTable("orders", {
   total: decimal("total", { precision: 10, scale: 2 }).default("0.00").notNull(),
   notes: text("notes"),
   deliveryOrderId: varchar("deliveryOrderId", { length: 255 }), // ID do pedido no sistema de delivery
+  source: mysqlEnum("source", ["pdv", "buscazap"]).default("pdv").notNull(), // Origem do pedido
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   closedAt: timestamp("closedAt"),

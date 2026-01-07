@@ -1,0 +1,8 @@
+{
+  "query": "ALTER TABLE delivery_requests \nADD COLUMN deliveryType ENUM('one_way', 'round_trip', 'document', 'signature', 'notary', 'purchase', 'pickup_return') DEFAULT 'one_way' NOT NULL AFTER estimatedPrice,\nADD COLUMN isRoundTrip INT DEFAULT 0 NOT NULL AFTER deliveryType,\nADD COLUMN returnAddress TEXT AFTER isRoundTrip,\nADD COLUMN actualPrice INT AFTER returnAddress,\nADD COLUMN distance INT AFTER actualPrice;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2qhSSFP4WQwHFmf.de20c608a165 --database NwfRG23uTZjNkVH35w5GRb --execute ALTER TABLE delivery_requests \nADD COLUMN deliveryType ENUM('one_way', 'round_trip', 'document', 'signature', 'notary', 'purchase', 'pickup_return') DEFAULT 'one_way' NOT NULL AFTER estimatedPrice,\nADD COLUMN isRoundTrip INT DEFAULT 0 NOT NULL AFTER deliveryType,\nADD COLUMN returnAddress TEXT AFTER isRoundTrip,\nADD COLUMN actualPrice INT AFTER returnAddress,\nADD COLUMN distance INT AFTER actualPrice;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'estimatedprice' in 'delivery_requests'"
+  ]
+}

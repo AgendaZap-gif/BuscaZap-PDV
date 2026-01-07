@@ -29,6 +29,13 @@
       "when": 1767747924156,
       "tag": "0003_salty_exiles",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1767799479696,
+      "tag": "0004_friendly_pete_wisdom",
+      "breakpoints": true
     }
   ]
 }

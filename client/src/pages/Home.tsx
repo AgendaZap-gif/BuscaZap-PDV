@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLoginUrl } from "@/const";
-import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed } from "lucide-react";
+import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Home() {
@@ -90,6 +90,13 @@ export default function Home() {
       icon: Package,
       path: "/products",
       color: "bg-indigo-500",
+    },
+    {
+      title: "Pedidos BuscaZap",
+      description: "Receber e gerenciar pedidos do app",
+      icon: Smartphone,
+      path: "/buscazap-orders",
+      color: "bg-amber-500",
     },
   ];
 

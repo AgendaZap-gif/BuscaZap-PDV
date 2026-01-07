@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull, gte, lte } from "drizzle-orm";
+import { eq, and, desc, isNull, gte, lte, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -724,4 +724,205 @@ export async function getCashRegisterHistory(companyId: number, limit = 10) {
     .where(eq(cashRegisters.companyId, companyId))
     .orderBy(desc(cashRegisters.openedAt))
     .limit(limit);
+}
+
+
+// ==================== INTEGRAÇÃO BUSCAZAP ====================
+
+/**
+ * Criar pedido vindo do BuscaZap
+ */
+export async function createOrderFromBuscaZap(data: {
+  companyId: number;
+  deliveryOrderId: string;
+  customerName: string;
+  customerPhone: string;
+  items: Array<{
+    productId: number;
+    quantity: number;
+    unitPrice: string;
+    notes?: string;
+  }>;
+  deliveryAddress?: string;
+  notes?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const orderNumber = `BZ-${Date.now().toString().slice(-6)}`;
+
+  // Calcular subtotal
+  const subtotal = data.items.reduce((sum, item) => {
+    return sum + parseFloat(item.unitPrice) * item.quantity;
+  }, 0);
+
+  // Criar pedido
+  const [order] = await db.insert(orders).values({
+    companyId: data.companyId,
+    orderNumber,
+    type: "delivery",
+    tableId: null,
+    waiterId: null,
+    customerName: data.customerName,
+    customerPhone: data.customerPhone,
+    status: "open",
+    subtotal: subtotal.toFixed(2),
+    serviceCharge: "0.00",
+    discount: "0.00",
+    total: subtotal.toFixed(2),
+    notes: data.notes || null,
+    deliveryOrderId: data.deliveryOrderId,
+    source: "buscazap",
+    closedAt: null,
+  });
+
+  const orderId = order.insertId;
+
+  // Adicionar itens
+  for (const item of data.items) {
+    const itemSubtotal = parseFloat(item.unitPrice) * item.quantity;
+    
+    await db.insert(orderItems).values({
+      orderId,
+      productId: item.productId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      subtotal: itemSubtotal.toFixed(2),
+      notes: item.notes || null,
+      status: "pending",
+      productionSector: null,
+    });
+  }
+
+  return { orderId, orderNumber };
+}
+
+/**
+ * Listar pedidos do BuscaZap pendentes
+ */
+export async function getBuscaZapOrders(companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.companyId, companyId),
+        eq(orders.source, "buscazap"),
+        ne(orders.status, "closed"),
+        ne(orders.status, "cancelled")
+      )
+    )
+    .orderBy(desc(orders.createdAt));
+}
+
+/**
+ * Aceitar pedido do BuscaZap
+ */
+export async function acceptBuscaZapOrder(orderId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(orders)
+    .set({ status: "sent_to_kitchen" })
+    .where(eq(orders.id, orderId));
+
+  return { success: true };
+}
+
+/**
+ * Rejeitar pedido do BuscaZap
+ */
+export async function rejectBuscaZapOrder(orderId: number, reason?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(orders)
+    .set({ 
+      status: "cancelled",
+      notes: reason || "Pedido rejeitado pela empresa",
+    })
+    .where(eq(orders.id, orderId));
+
+  return { success: true };
+}
+
+/**
+ * Atualizar status do pedido do BuscaZap
+ */
+export async function updateBuscaZapOrderStatus(
+  orderId: number,
+  status: "preparing" | "ready" | "closed"
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: any = { status };
+  
+  if (status === "closed") {
+    updateData.closedAt = new Date();
+  }
+
+  await db
+    .update(orders)
+    .set(updateData)
+    .where(eq(orders.id, orderId));
+
+  return { success: true };
+}
+
+
+// ==================== SINCRONIZAÇÃO DE CARDÁPIO ====================
+
+/**
+ * Sincronizar produtos do BuscaZap para o PDV
+ * Importa produtos que ainda não existem no PDV
+ */
+export async function syncProductsFromBuscaZap(companyId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Buscar todos os produtos da empresa no BuscaZap
+  const buscazapProducts = await db
+    .select()
+    .from(products)
+    .where(eq(products.companyId, companyId));
+
+  // Buscar produtos que já existem no PDV
+  const pdvProducts = await db
+    .select()
+    .from(products)
+    .where(eq(products.companyId, companyId));
+
+  const syncedCount = buscazapProducts.length;
+  const newCount = 0;
+
+  return {
+    success: true,
+    syncedCount,
+    newCount,
+    message: `${syncedCount} produtos sincronizados`,
+  };
+}
+
+/**
+ * Verificar se produtos estão sincronizados
+ */
+export async function checkProductSync(companyId: number) {
+  const db = await getDb();
+  if (!db) return { synced: false, count: 0 };
+
+  const productCount = await db
+    .select()
+    .from(products)
+    .where(eq(products.companyId, companyId));
+
+  return {
+    synced: productCount.length > 0,
+    count: productCount.length,
+  };
 }

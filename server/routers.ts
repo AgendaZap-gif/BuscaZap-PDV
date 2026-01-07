@@ -194,6 +194,7 @@ export const appRouter = router({
           total: "0.00",
           notes: null,
           deliveryOrderId: null,
+          source: "pdv",
           closedAt: null,
         });
         return { id, orderNumber };
@@ -720,5 +721,88 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+
+  // ==================== INTEGRAÇÃO BUSCAZAP ====================
+  buscazapIntegration: router({
+    // Criar pedido vindo do BuscaZap
+    createOrder: publicProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          deliveryOrderId: z.string(),
+          customerName: z.string(),
+          customerPhone: z.string(),
+          items: z.array(
+            z.object({
+              productId: z.number(),
+              quantity: z.number(),
+              unitPrice: z.string(),
+              notes: z.string().optional(),
+            })
+          ),
+          deliveryAddress: z.string().optional(),
+          notes: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await db.createOrderFromBuscaZap(input);
+      }),
+
+    // Listar pedidos do BuscaZap
+    listOrders: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getBuscaZapOrders(input.companyId);
+      }),
+
+    // Aceitar pedido
+    acceptOrder: protectedProcedure
+      .input(z.object({ orderId: z.number() }))
+      .mutation(async ({ input }) => {
+        return await db.acceptBuscaZapOrder(input.orderId);
+      }),
+
+    // Rejeitar pedido
+    rejectOrder: protectedProcedure
+      .input(
+        z.object({
+          orderId: z.number(),
+          reason: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await db.rejectBuscaZapOrder(input.orderId, input.reason);
+      }),
+
+    // Atualizar status do pedido
+    updateStatus: protectedProcedure
+      .input(
+        z.object({
+          orderId: z.number(),
+          status: z.enum(["preparing", "ready", "closed"]),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await db.updateBuscaZapOrderStatus(input.orderId, input.status);
+      }),
+  }),
+
+  // ==================== SINCRONIZAÇÃO DE CARDÁPIO ====================
+  productSync: router({
+    // Sincronizar produtos do BuscaZap
+    sync: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .mutation(async ({ input }) => {
+        return await db.syncProductsFromBuscaZap(input.companyId);
+      }),
+
+    // Verificar status de sincronização
+    checkStatus: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.checkProductSync(input.companyId);
+      }),
+  }),
 });
+
 export type AppRouter = typeof appRouter;

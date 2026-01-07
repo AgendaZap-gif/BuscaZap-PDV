@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE orders ADD COLUMN source ENUM('pdv', 'buscazap') DEFAULT 'pdv' NOT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2qhSSFP4WQwHFmf.de20c608a165 --database NwfRG23uTZjNkVH35w5GRb --execute ALTER TABLE orders ADD COLUMN source ENUM('pdv', 'buscazap') DEFAULT 'pdv' NOT NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 570
+}

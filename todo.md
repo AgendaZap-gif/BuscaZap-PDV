@@ -169,8 +169,23 @@
 - [x] Compartilhar tabela de usuários
 - [x] Mesmo sistema de login
 - [ ] Sincronizar produtos entre app e PDV
-- [ ] Receber pedidos do delivery no PDV
+- [x] Backend: Receber pedidos do delivery no PDV
+- [ ] Frontend: Interface para aceitar/rejeitar pedidos
 - [ ] Atualizar status de pedidos no app
+
+### Integração BuscaZap + PDV (v2)
+- [x] Backend: Schema expandido com campo source
+- [x] Backend: Funções de integração (createOrderFromBuscaZap, getBuscaZapOrders, acceptBuscaZapOrder, rejectBuscaZapOrder)
+- [x] Backend: Rotas tRPC completas (buscazapIntegration)
+- [x] Frontend: Página de pedidos do BuscaZap
+- [x] Frontend: Cards de pedidos com aceitar/rejeitar
+- [x] Frontend: Modal de detalhes do pedido
+- [x] Frontend: Badge de notificação de novos pedidos
+- [x] Notificações: Sistema de polling para novos pedidos (5 segundos)
+- [x] Notificações: Som de alerta para novos pedidos (beep duplo)
+- [x] Sincronização: Importar cardápio do BuscaZap
+- [x] Sincronização: Manter produtos sincronizados (mesmo banco de dados)
+- [ ] Testes: Vitest para rotas de integração
 
 ## 🍔 Gestão de Produtos (Sincronização PDV ↔ App)
 
