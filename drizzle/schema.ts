@@ -284,3 +284,36 @@ export const deliveryRequests = mysqlTable("delivery_requests", {
 
 export type DeliveryRequest = typeof deliveryRequests.$inferSelect;
 export type InsertDeliveryRequest = typeof deliveryRequests.$inferInsert;
+
+
+/**
+ * Chat Messages - Mensagens entre PDV e Cliente
+ */
+export const chatMessages = mysqlTable("chat_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull(),
+  senderId: int("senderId").notNull(), // ID do usuário que enviou
+  senderType: mysqlEnum("senderType", ["customer", "business"]).notNull(),
+  message: text("message").notNull(),
+  isRead: boolean("isRead").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;
+
+/**
+ * Order Ratings - Avaliações de pedidos
+ */
+export const orderRatings = mysqlTable("order_ratings", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull().unique(),
+  customerId: int("customerId").notNull(),
+  companyId: int("companyId").notNull(),
+  rating: int("rating").notNull(), // 1-5 estrelas
+  comment: text("comment"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type OrderRating = typeof orderRatings.$inferSelect;
+export type InsertOrderRating = typeof orderRatings.$inferInsert;

@@ -17,6 +17,8 @@ import {
   printers,
   billSplits,
   deliveryRequests,
+  chatMessages,
+  orderRatings,
   type Company,
   type Table,
   type Category,
@@ -1281,4 +1283,209 @@ export async function getOrdersByWeekday(companyId: number) {
     day: weekdayNames[parseInt(day)],
     count,
   }));
+}
+
+
+// ==================== CHAT PDV ↔ CLIENTE ====================
+
+/**
+ * Enviar mensagem no chat
+ */
+export async function sendChatMessage(data: {
+  orderId: number;
+  senderId: number;
+  senderType: "customer" | "business";
+  message: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [result] = await db.insert(chatMessages).values({
+    orderId: data.orderId,
+    senderId: data.senderId,
+    senderType: data.senderType,
+    message: data.message,
+    isRead: false,
+  });
+
+  return { success: true, messageId: result.insertId };
+}
+
+/**
+ * Buscar mensagens de um pedido
+ */
+export async function getChatMessages(orderId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const messages = await db
+    .select()
+    .from(chatMessages)
+    .where(eq(chatMessages.orderId, orderId))
+    .orderBy(chatMessages.createdAt);
+
+  return messages;
+}
+
+/**
+ * Marcar mensagens como lidas
+ */
+export async function markMessagesAsRead(orderId: number, senderType: "customer" | "business") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Marcar como lidas as mensagens do outro lado
+  const otherType = senderType === "customer" ? "business" : "customer";
+
+  await db
+    .update(chatMessages)
+    .set({ isRead: true })
+    .where(
+      and(
+        eq(chatMessages.orderId, orderId),
+        eq(chatMessages.senderType, otherType),
+        eq(chatMessages.isRead, false)
+      )
+    );
+
+  return { success: true };
+}
+
+/**
+ * Contar mensagens não lidas
+ */
+export async function getUnreadCount(orderId: number, forType: "customer" | "business") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Contar mensagens não lidas do outro lado
+  const otherType = forType === "customer" ? "business" : "customer";
+
+  const messages = await db
+    .select()
+    .from(chatMessages)
+    .where(
+      and(
+        eq(chatMessages.orderId, orderId),
+        eq(chatMessages.senderType, otherType),
+        eq(chatMessages.isRead, false)
+      )
+    );
+
+  return messages.length;
+}
+
+
+// ==================== AVALIAÇÕES ====================
+
+/**
+ * Criar avaliação de pedido
+ */
+export async function createOrderRating(data: {
+  orderId: number;
+  customerId: number;
+  companyId: number;
+  rating: number;
+  comment?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Verificar se já existe avaliação para este pedido
+  const existing = await db
+    .select()
+    .from(orderRatings)
+    .where(eq(orderRatings.orderId, data.orderId))
+    .limit(1);
+
+  if (existing.length > 0) {
+    throw new Error("Pedido já foi avaliado");
+  }
+
+  const [result] = await db.insert(orderRatings).values({
+    orderId: data.orderId,
+    customerId: data.customerId,
+    companyId: data.companyId,
+    rating: data.rating,
+    comment: data.comment || null,
+  });
+
+  return { success: true, ratingId: result.insertId };
+}
+
+/**
+ * Buscar avaliação de um pedido
+ */
+export async function getOrderRating(orderId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const rating = await db
+    .select()
+    .from(orderRatings)
+    .where(eq(orderRatings.orderId, orderId))
+    .limit(1);
+
+  return rating[0] || null;
+}
+
+/**
+ * Buscar todas as avaliações de uma empresa
+ */
+export async function getCompanyRatings(companyId: number, limit: number = 50) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const ratings = await db
+    .select({
+      id: orderRatings.id,
+      orderId: orderRatings.orderId,
+      rating: orderRatings.rating,
+      comment: orderRatings.comment,
+      createdAt: orderRatings.createdAt,
+      orderNumber: orders.orderNumber,
+      customerName: orders.customerName,
+    })
+    .from(orderRatings)
+    .leftJoin(orders, eq(orderRatings.orderId, orders.id))
+    .where(eq(orderRatings.companyId, companyId))
+    .orderBy(desc(orderRatings.createdAt))
+    .limit(limit);
+
+  return ratings;
+}
+
+/**
+ * Calcular média de avaliações de uma empresa
+ */
+export async function getCompanyRatingStats(companyId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const ratings = await db
+    .select()
+    .from(orderRatings)
+    .where(eq(orderRatings.companyId, companyId));
+
+  if (ratings.length === 0) {
+    return {
+      totalRatings: 0,
+      averageRating: 0,
+      distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+    };
+  }
+
+  const total = ratings.reduce((sum, r) => sum + r.rating, 0);
+  const average = total / ratings.length;
+
+  const distribution = ratings.reduce((acc, r) => {
+    acc[r.rating as 1 | 2 | 3 | 4 | 5]++;
+    return acc;
+  }, { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<1 | 2 | 3 | 4 | 5, number>);
+
+  return {
+    totalRatings: ratings.length,
+    averageRating: Math.round(average * 10) / 10,
+    distribution,
+  };
 }

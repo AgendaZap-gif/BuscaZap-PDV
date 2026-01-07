@@ -268,3 +268,27 @@
 - [x] Gráfico: Pedidos por horário (horários de pico)
 - [x] Gráfico: Pedidos por dia da semana
 - [x] Filtro por período (hoje, semana, mês)
+
+
+## 🚀 NOVAS FUNCIONALIDADES (v4)
+
+### Chat Direto PDV ↔ Cliente
+- [x] Backend: Schema de mensagens (tabela chat_messages)
+- [x] Backend: Rotas tRPC para enviar/receber mensagens
+- [x] Backend: Sistema de polling para novas mensagens (2 segundos)
+- [x] Frontend PDV: Interface de chat na página de pedidos
+- [x] Frontend PDV: Marcação automática de mensagens como lidas
+- [ ] Frontend PDV: Badge de mensagens não lidas
+- [ ] Frontend PDV: Notificação sonora para novas mensagens
+- [ ] Frontend App: Interface de chat no pedido ativo
+- [x] Mensagens pré-definidas (endereço, troco, pronto)
+
+### Sistema de Avaliação Pós-Entrega
+- [x] Backend: Schema de avaliações (tabela order_ratings)
+- [x] Backend: Rotas tRPC para criar/buscar avaliações
+- [x] Backend: Cálculo de média de avaliações e distribuição
+- [ ] Frontend App: Modal de avaliação após entrega
+- [ ] Frontend App: Estrelas (1-5) + comentário opcional
+- [x] Frontend PDV: Visualização de avaliações recebidas
+- [x] Frontend PDV: Métricas de satisfação no dashboard (média, distribuição, insights)
+- [ ] Notificação automática para avaliar após 5min da entrega

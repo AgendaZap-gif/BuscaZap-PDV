@@ -862,6 +862,98 @@ export const appRouter = router({
         return await db.getOrdersByWeekday(input.companyId);
       }),
   }),
+
+  // ==================== CHAT ====================
+  chat: router({
+    // Enviar mensagem
+    sendMessage: publicProcedure
+      .input(
+        z.object({
+          orderId: z.number(),
+          senderId: z.number(),
+          senderType: z.enum(["customer", "business"]),
+          message: z.string().min(1),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await db.sendChatMessage(input);
+      }),
+
+    // Buscar mensagens
+    getMessages: publicProcedure
+      .input(z.object({ orderId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getChatMessages(input.orderId);
+      }),
+
+    // Marcar como lidas
+    markAsRead: publicProcedure
+      .input(
+        z.object({
+          orderId: z.number(),
+          senderType: z.enum(["customer", "business"]),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await db.markMessagesAsRead(input.orderId, input.senderType);
+      }),
+
+    // Contar não lidas
+    getUnreadCount: publicProcedure
+      .input(
+        z.object({
+          orderId: z.number(),
+          forType: z.enum(["customer", "business"]),
+        })
+      )
+      .query(async ({ input }) => {
+        return await db.getUnreadCount(input.orderId, input.forType);
+      }),
+  }),
+
+  // ==================== AVALIAÇÕES ====================
+  ratings: router({
+    // Criar avaliação
+    create: publicProcedure
+      .input(
+        z.object({
+          orderId: z.number(),
+          customerId: z.number(),
+          companyId: z.number(),
+          rating: z.number().min(1).max(5),
+          comment: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await db.createOrderRating(input);
+      }),
+
+    // Buscar avaliação de um pedido
+    getByOrder: publicProcedure
+      .input(z.object({ orderId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getOrderRating(input.orderId);
+      }),
+
+    // Buscar avaliações da empresa
+    getByCompany: protectedProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          limit: z.number().optional(),
+        })
+      )
+      .query(async ({ input }) => {
+        return await db.getCompanyRatings(input.companyId, input.limit);
+      }),
+
+    // Estatísticas de avaliações
+    getStats: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getCompanyRatingStats(input.companyId);
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

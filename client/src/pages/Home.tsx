@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLoginUrl } from "@/const";
-import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone } from "lucide-react";
+import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone, Star } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Home() {
@@ -104,6 +104,13 @@ export default function Home() {
       icon: TrendingUp,
       path: "/buscazap-stats",
       color: "bg-purple-500",
+    },
+    {
+      title: "Avaliações",
+      description: "Feedback dos clientes",
+      icon: Star,
+      path: "/ratings",
+      color: "bg-yellow-500",
     },
   ];
 

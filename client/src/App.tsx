@@ -16,6 +16,8 @@ import Reports from "./pages/Reports";
 import Products from "./pages/Products";
 import BuscaZapOrders from "./pages/BuscaZapOrders";
 import BuscaZapStats from "./pages/BuscaZapStats";
+import OrderChat from "./pages/OrderChat";
+import Ratings from "./pages/Ratings";
 
 function Router() {
   return (
@@ -28,6 +30,8 @@ function Router() {
       <Route path="/products" component={Products} />
       <Route path="/buscazap-orders" component={BuscaZapOrders} />
       <Route path="/buscazap-stats" component={BuscaZapStats} />
+      <Route path="/chat/:orderId" component={OrderChat} />
+      <Route path="/ratings" component={Ratings} />
       <Route path="/select-company" component={SelectCompany} />
       <Route path={"/cashier"} component={Cashier} />
       <Route path={"/cash-register"} component={CashRegister} />
