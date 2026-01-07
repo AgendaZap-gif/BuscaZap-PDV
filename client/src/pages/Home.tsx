@@ -98,6 +98,13 @@ export default function Home() {
       path: "/buscazap-orders",
       color: "bg-amber-500",
     },
+    {
+      title: "Estatísticas BuscaZap",
+      description: "Análise de desempenho e métricas",
+      icon: TrendingUp,
+      path: "/buscazap-stats",
+      color: "bg-purple-500",
+    },
   ];
 
   return (

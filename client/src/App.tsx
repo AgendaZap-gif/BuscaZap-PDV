@@ -15,6 +15,7 @@ import CashRegister from "./pages/CashRegister";
 import Reports from "./pages/Reports";
 import Products from "./pages/Products";
 import BuscaZapOrders from "./pages/BuscaZapOrders";
+import BuscaZapStats from "./pages/BuscaZapStats";
 
 function Router() {
   return (
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/kitchen" component={Kitchen} />
       <Route path="/products" component={Products} />
       <Route path="/buscazap-orders" component={BuscaZapOrders} />
+      <Route path="/buscazap-stats" component={BuscaZapStats} />
       <Route path="/select-company" component={SelectCompany} />
       <Route path={"/cashier"} component={Cashier} />
       <Route path={"/cash-register"} component={CashRegister} />

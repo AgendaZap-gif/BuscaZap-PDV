@@ -759,7 +759,12 @@ export const appRouter = router({
     acceptOrder: protectedProcedure
       .input(z.object({ orderId: z.number() }))
       .mutation(async ({ input }) => {
-        return await db.acceptBuscaZapOrder(input.orderId);
+        const result = await db.acceptBuscaZapOrder(input.orderId);
+        // Imprimir automaticamente ao aceitar
+        await db.printOrder(input.orderId);
+        // Notificar cliente
+        await db.notifyOrderStatus(input.orderId, "sent_to_kitchen");
+        return result;
       }),
 
     // Rejeitar pedido
@@ -783,7 +788,10 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ input }) => {
-        return await db.updateBuscaZapOrderStatus(input.orderId, input.status);
+        const result = await db.updateBuscaZapOrderStatus(input.orderId, input.status);
+        // Notificar cliente sobre mudança de status
+        await db.notifyOrderStatus(input.orderId, input.status);
+        return result;
       }),
   }),
 
@@ -801,6 +809,57 @@ export const appRouter = router({
       .input(z.object({ companyId: z.number() }))
       .query(async ({ input }) => {
         return await db.checkProductSync(input.companyId);
+      }),
+  }),
+
+  // ==================== IMPRESSÃO ====================
+  printing: router({
+    // Imprimir pedido
+    printOrder: protectedProcedure
+      .input(z.object({ orderId: z.number() }))
+      .mutation(async ({ input }) => {
+        return await db.printOrder(input.orderId);
+      }),
+
+    // Buscar impressora da cozinha
+    getKitchenPrinter: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getKitchenPrinter(input.companyId);
+      }),
+  }),
+
+  // ==================== ESTATÍSTICAS BUSCAZAP ====================
+  buscazapStats: router({
+    // Buscar estatísticas gerais
+    getStats: protectedProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          period: z.enum(["today", "week", "month"]),
+        })
+      )
+      .query(async ({ input }) => {
+        return await db.getBuscaZapStats(input.companyId, input.period);
+      }),
+
+    // Buscar pedidos por horário
+    getOrdersByHour: protectedProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          period: z.enum(["today", "week", "month"]),
+        })
+      )
+      .query(async ({ input }) => {
+        return await db.getOrdersByHour(input.companyId, input.period);
+      }),
+
+    // Buscar pedidos por dia da semana
+    getOrdersByWeekday: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getOrdersByWeekday(input.companyId);
       }),
   }),
 });

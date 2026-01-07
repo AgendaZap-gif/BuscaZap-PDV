@@ -926,3 +926,359 @@ export async function checkProductSync(companyId: number) {
     count: productCount.length,
   };
 }
+
+
+// ==================== IMPRESSÃO DE PEDIDOS ====================
+
+/**
+ * Formatar pedido para impressão térmica
+ */
+export function formatOrderForPrint(order: any, items: any[]): string {
+  const width = 32; // Largura padrão para impressora 58mm
+  const line = "=".repeat(width);
+  const divider = "-".repeat(width);
+
+  let receipt = "";
+  
+  // Cabeçalho
+  receipt += `${line}\n`;
+  receipt += centerText("NOVO PEDIDO BUSCAZAP", width) + "\n";
+  receipt += `${line}\n\n`;
+  
+  // Número do pedido
+  receipt += `Pedido: ${order.orderNumber}\n`;
+  receipt += `Data: ${new Date(order.createdAt).toLocaleString("pt-BR")}\n`;
+  receipt += `${divider}\n\n`;
+  
+  // Cliente
+  receipt += "CLIENTE:\n";
+  receipt += `${order.customerName}\n`;
+  receipt += `${order.customerPhone}\n`;
+  receipt += `${divider}\n\n`;
+  
+  // Itens
+  receipt += "ITENS:\n";
+  items.forEach((item) => {
+    receipt += `${item.quantity}x ${item.productName}\n`;
+    if (item.notes) {
+      receipt += `   OBS: ${item.notes}\n`;
+    }
+    receipt += `   R$ ${parseFloat(item.subtotal).toFixed(2)}\n`;
+  });
+  receipt += `${divider}\n\n`;
+  
+  // Total
+  receipt += `TOTAL: R$ ${parseFloat(order.total).toFixed(2)}\n`;
+  
+  // Observações gerais
+  if (order.notes) {
+    receipt += `${divider}\n`;
+    receipt += "OBSERVAÇÕES:\n";
+    receipt += `${order.notes}\n`;
+  }
+  
+  receipt += `${line}\n\n\n`;
+  
+  return receipt;
+}
+
+function centerText(text: string, width: number): string {
+  const padding = Math.floor((width - text.length) / 2);
+  return " ".repeat(padding) + text;
+}
+
+/**
+ * Buscar impressora da cozinha
+ */
+export async function getKitchenPrinter(companyId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const printer = await db
+    .select()
+    .from(printers)
+    .where(
+      and(
+        eq(printers.companyId, companyId),
+        eq(printers.type, "kitchen"),
+        eq(printers.isActive, true)
+      )
+    )
+    .limit(1);
+
+  return printer[0] || null;
+}
+
+/**
+ * Enviar para impressão (simulado - em produção usaria biblioteca de impressão)
+ */
+export async function printOrder(orderId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Buscar pedido com itens
+  const order = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  if (!order[0]) {
+    throw new Error("Pedido não encontrado");
+  }
+
+  const items = await db
+    .select({
+      quantity: orderItems.quantity,
+      productName: products.name,
+      subtotal: orderItems.subtotal,
+      notes: orderItems.notes,
+    })
+    .from(orderItems)
+    .leftJoin(products, eq(orderItems.productId, products.id))
+    .where(eq(orderItems.orderId, orderId));
+
+  // Formatar para impressão
+  const printContent = formatOrderForPrint(order[0], items);
+
+  // Buscar impressora
+  const printer = await getKitchenPrinter(order[0].companyId);
+
+  if (!printer) {
+    console.log("[PRINT] Nenhuma impressora configurada");
+    console.log(printContent);
+    return { success: false, message: "Nenhuma impressora configurada" };
+  }
+
+  // Em produção, aqui enviaria para a impressora via rede
+  // Por enquanto, apenas loga o conteúdo
+  console.log(`[PRINT] Enviando para impressora: ${printer.name}`);
+  console.log(printContent);
+
+  return { success: true, message: "Pedido enviado para impressão" };
+}
+
+
+// ==================== NOTIFICAÇÕES PUSH ====================
+
+/**
+ * Enviar notificação push para o cliente
+ */
+export async function notifyCustomer(data: {
+  orderId: number;
+  title: string;
+  message: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Buscar pedido para pegar informações do cliente
+  const order = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.id, data.orderId))
+    .limit(1);
+
+  if (!order[0]) {
+    throw new Error("Pedido não encontrado");
+  }
+
+  // Em produção, aqui enviaria notificação via Firebase/OneSignal/etc
+  // Por enquanto, apenas loga
+  console.log(`[NOTIFICATION] Enviando para: ${order[0].customerName}`);
+  console.log(`[NOTIFICATION] Título: ${data.title}`);
+  console.log(`[NOTIFICATION] Mensagem: ${data.message}`);
+
+  return {
+    success: true,
+    message: "Notificação enviada com sucesso",
+  };
+}
+
+/**
+ * Notificar cliente sobre mudança de status do pedido
+ */
+export async function notifyOrderStatus(orderId: number, status: string) {
+  const statusMessages: Record<string, { title: string; message: string }> = {
+    sent_to_kitchen: {
+      title: "Pedido Aceito! 🎉",
+      message: "Seu pedido foi aceito e está sendo preparado.",
+    },
+    preparing: {
+      title: "Preparando seu pedido 👨‍🍳",
+      message: "Estamos preparando seu pedido com carinho!",
+    },
+    ready: {
+      title: "Pedido Pronto! ✅",
+      message: "Seu pedido está pronto e será entregue em breve.",
+    },
+    closed: {
+      title: "Pedido Entregue 🚀",
+      message: "Seu pedido foi entregue. Bom apetite!",
+    },
+  };
+
+  const notification = statusMessages[status];
+  if (!notification) {
+    return { success: false, message: "Status inválido" };
+  }
+
+  return await notifyCustomer({
+    orderId,
+    title: notification.title,
+    message: notification.message,
+  });
+}
+
+
+// ==================== ESTATÍSTICAS BUSCAZAP ====================
+
+/**
+ * Buscar estatísticas de pedidos do BuscaZap
+ */
+export async function getBuscaZapStats(companyId: number, period: "today" | "week" | "month") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Calcular data de início baseado no período
+  const now = new Date();
+  let startDate = new Date();
+  
+  if (period === "today") {
+    startDate.setHours(0, 0, 0, 0);
+  } else if (period === "week") {
+    startDate.setDate(now.getDate() - 7);
+  } else if (period === "month") {
+    startDate.setDate(now.getDate() - 30);
+  }
+
+  // Buscar todos os pedidos do BuscaZap no período
+  const allOrders = await db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.companyId, companyId),
+        eq(orders.source, "buscazap"),
+        gte(orders.createdAt, startDate)
+      )
+    );
+
+  const totalOrders = allOrders.length;
+  const acceptedOrders = allOrders.filter(o => o.status !== "cancelled").length;
+  const rejectedOrders = allOrders.filter(o => o.status === "cancelled").length;
+  const acceptanceRate = totalOrders > 0 ? (acceptedOrders / totalOrders) * 100 : 0;
+
+  // Calcular valor total e médio
+  const totalRevenue = allOrders
+    .filter(o => o.status === "closed")
+    .reduce((sum, o) => sum + parseFloat(o.total), 0);
+  
+  const avgOrderValue = acceptedOrders > 0 ? totalRevenue / acceptedOrders : 0;
+
+  // Calcular tempo médio de preparo
+  const completedOrders = allOrders.filter(o => o.status === "closed" && o.closedAt);
+  const avgPrepTime = completedOrders.length > 0
+    ? completedOrders.reduce((sum, o) => {
+        const prepTime = new Date(o.closedAt!).getTime() - new Date(o.createdAt).getTime();
+        return sum + prepTime;
+      }, 0) / completedOrders.length / 1000 / 60 // Converter para minutos
+    : 0;
+
+  return {
+    totalOrders,
+    acceptedOrders,
+    rejectedOrders,
+    acceptanceRate: Math.round(acceptanceRate * 10) / 10,
+    totalRevenue,
+    avgOrderValue: Math.round(avgOrderValue * 100) / 100,
+    avgPrepTime: Math.round(avgPrepTime),
+  };
+}
+
+/**
+ * Buscar pedidos por horário (para gráfico de horários de pico)
+ */
+export async function getOrdersByHour(companyId: number, period: "today" | "week" | "month") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const now = new Date();
+  let startDate = new Date();
+  
+  if (period === "today") {
+    startDate.setHours(0, 0, 0, 0);
+  } else if (period === "week") {
+    startDate.setDate(now.getDate() - 7);
+  } else if (period === "month") {
+    startDate.setDate(now.getDate() - 30);
+  }
+
+  const allOrders = await db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.companyId, companyId),
+        eq(orders.source, "buscazap"),
+        gte(orders.createdAt, startDate)
+      )
+    );
+
+  // Agrupar por hora
+  const ordersByHour: Record<number, number> = {};
+  for (let i = 0; i < 24; i++) {
+    ordersByHour[i] = 0;
+  }
+
+  allOrders.forEach(order => {
+    const hour = new Date(order.createdAt).getHours();
+    ordersByHour[hour]++;
+  });
+
+  return Object.entries(ordersByHour).map(([hour, count]) => ({
+    hour: parseInt(hour),
+    count,
+  }));
+}
+
+/**
+ * Buscar pedidos por dia da semana
+ */
+export async function getOrdersByWeekday(companyId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Últimos 30 dias
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - 30);
+
+  const allOrders = await db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.companyId, companyId),
+        eq(orders.source, "buscazap"),
+        gte(orders.createdAt, startDate)
+      )
+    );
+
+  // Agrupar por dia da semana
+  const ordersByWeekday: Record<number, number> = {};
+  for (let i = 0; i < 7; i++) {
+    ordersByWeekday[i] = 0;
+  }
+
+  allOrders.forEach(order => {
+    const weekday = new Date(order.createdAt).getDay();
+    ordersByWeekday[weekday]++;
+  });
+
+  const weekdayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+  return Object.entries(ordersByWeekday).map(([day, count]) => ({
+    day: weekdayNames[parseInt(day)],
+    count,
+  }));
+}

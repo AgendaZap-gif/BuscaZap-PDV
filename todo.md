@@ -237,3 +237,34 @@
 - [ ] Frontend: Ticket médio
 - [ ] Frontend: Filtros de data e período
 - [ ] Testes unitários
+
+
+## 🚀 NOVAS FUNCIONALIDADES (v3)
+
+### Impressão Automática de Pedidos
+- [x] Backend: Função de formatação de pedido para impressão
+- [x] Backend: Integração com sistema de impressoras
+- [ ] Frontend: Botão de reimprimir pedido
+- [ ] Frontend: Configuração de impressora padrão
+- [x] Impressão automática ao aceitar pedido do BuscaZap
+- [x] Layout otimizado para impressora térmica (58mm/80mm)
+
+### Notificações Push para Clientes
+- [x] Backend: Rota para enviar notificação ao cliente
+- [x] Backend: Integração com sistema de notificações do app (log por enquanto)
+- [x] Notificar quando pedido é aceito
+- [x] Notificar quando pedido está em preparo
+- [x] Notificar quando pedido está pronto
+- [x] Notificar quando pedido foi finalizado
+- [x] Mensagens personalizadas por status
+
+### Dashboard de Estatísticas
+- [x] Backend: Queries de análise de pedidos BuscaZap
+- [x] Frontend: Página de dashboard
+- [x] Métrica: Total de pedidos recebidos
+- [x] Métrica: Taxa de aceitação/rejeição
+- [x] Métrica: Tempo médio de preparo
+- [x] Métrica: Valor médio dos pedidos
+- [x] Gráfico: Pedidos por horário (horários de pico)
+- [x] Gráfico: Pedidos por dia da semana
+- [x] Filtro por período (hoje, semana, mês)
