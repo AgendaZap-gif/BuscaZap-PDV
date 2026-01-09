@@ -292,3 +292,21 @@
 - [x] Frontend PDV: Visualização de avaliações recebidas
 - [x] Frontend PDV: Métricas de satisfação no dashboard (média, distribuição, insights)
 - [ ] Notificação automática para avaliar após 5min da entrega
+
+
+## 🔄 SINCRONIZAÇÃO DE BANCO DE DADOS (v5)
+
+### Unificar PDV e App Mobile no Mesmo Banco
+- [x] Criar script de migração unificado para o banco do app mobile
+- [ ] Aplicar migrations do PDV no banco do Railway
+- [ ] Testar sincronização de produtos entre PDV e app
+- [ ] Testar sincronização de pedidos entre PDV e app
+- [ ] Verificar se website consulta dados corretamente
+- [x] Documentar estrutura unificada do banco de dados
+
+### Deploy do PDV no Railway
+- [x] Criar guia de deploy passo a passo
+- [ ] Configurar variáveis de ambiente no Railway
+- [ ] Configurar domínio pdv.buscazap.com.br
+- [ ] Testar acesso ao PDV em produção
+- [x] Documentar integração completa (Website + App + PDV)
