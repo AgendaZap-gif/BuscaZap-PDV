@@ -796,6 +796,17 @@ export async function createOrderFromBuscaZap(data: {
     });
   }
 
+  // Emitir evento WebSocket de novo pedido
+  try {
+    const { emitNewOrder } = await import("./_core/websocket");
+    const fullOrder = await getOrderById(orderId);
+    if (fullOrder) {
+      emitNewOrder(data.companyId, fullOrder);
+    }
+  } catch (error) {
+    console.log('[WebSocket] Failed to emit new order event:', error);
+  }
+
   return { orderId, orderNumber };
 }
 
@@ -1308,7 +1319,25 @@ export async function sendChatMessage(data: {
     isRead: false,
   });
 
-  return { success: true, messageId: result.insertId };
+  const messageId = result.insertId;
+
+  // Emitir evento WebSocket de nova mensagem
+  try {
+    const { emitNewChatMessage } = await import("./_core/websocket");
+    emitNewChatMessage(data.orderId, {
+      id: messageId,
+      orderId: data.orderId,
+      senderId: data.senderId,
+      senderType: data.senderType,
+      message: data.message,
+      isRead: false,
+      createdAt: new Date(),
+    });
+  } catch (error) {
+    console.log('[WebSocket] Failed to emit new chat message event:', error);
+  }
+
+  return { success: true, messageId };
 }
 
 /**

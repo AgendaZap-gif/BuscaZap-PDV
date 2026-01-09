@@ -310,3 +310,18 @@
 - [ ] Configurar domínio pdv.buscazap.com.br
 - [ ] Testar acesso ao PDV em produção
 - [x] Documentar integração completa (Website + App + PDV)
+
+
+## 🔌 WEBSOCKET EM TEMPO REAL (v6)
+
+### Substituir Polling por WebSocket
+- [x] Instalar dependências (socket.io)
+- [x] Implementar servidor WebSocket no backend
+- [x] Criar eventos para novos pedidos
+- [x] Criar eventos para novas mensagens de chat
+- [x] Criar eventos para atualização de status
+- [x] Atualizar frontend para conectar via WebSocket
+- [x] Remover polling de pedidos (5s)
+- [x] Remover polling de chat (2s)
+- [x] Testar comunicação em tempo real
+- [x] Documentar uso do WebSocket

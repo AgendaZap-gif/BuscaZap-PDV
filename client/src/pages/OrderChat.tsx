@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Send, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function OrderChat() {
   const params = useParams<{ orderId: string }>();
@@ -18,8 +19,25 @@ export default function OrderChat() {
   // Buscar mensagens
   const { data: messages, isLoading } = trpc.chat.getMessages.useQuery(
     { orderId },
-    { refetchInterval: 2000 } // Polling a cada 2 segundos
+    { refetchInterval: false } // Desabilitar polling, usar WebSocket
   );
+
+  // WebSocket para receber novas mensagens em tempo real
+  useWebSocket({
+    orderId,
+    onNewChatMessage: (newMessage) => {
+      console.log('[WebSocket] Nova mensagem recebida:', newMessage);
+      // Invalidar query para atualizar lista de mensagens
+      utils.chat.getMessages.invalidate({ orderId });
+      // Marcar como lida se for mensagem do cliente
+      if (newMessage.senderType === 'customer') {
+        markAsReadMutation.mutate({
+          orderId,
+          senderType: 'business',
+        });
+      }
+    },
+  });
 
   // Mutation para enviar mensagem
   const sendMutation = trpc.chat.sendMessage.useMutation({

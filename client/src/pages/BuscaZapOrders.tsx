@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Package, Phone, MapPin, Clock, CheckCircle, XCircle } from "lucide-react";
 import { useOrderNotification } from "@/hooks/use-order-notification";
+import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function BuscaZapOrders() {
   const { toast } = useToast();
@@ -17,10 +18,26 @@ export default function BuscaZapOrders() {
   const utils = trpc.useUtils();
 
   // Assumindo companyId 1 por enquanto - em produção virá do contexto do usuário
+  const companyId = 1;
   const { data: orders, isLoading } = trpc.buscazapIntegration.listOrders.useQuery(
-    { companyId: 1 },
-    { refetchInterval: 5000 } // Polling a cada 5 segundos
+    { companyId },
+    { refetchInterval: false } // Desabilitar polling, usar WebSocket
   );
+
+  // WebSocket para receber novos pedidos em tempo real
+  useWebSocket({
+    companyId,
+    onNewOrder: (order) => {
+      console.log('[WebSocket] Novo pedido recebido:', order);
+      // Invalidar query para atualizar lista
+      utils.buscazapIntegration.listOrders.invalidate();
+    },
+    onOrderStatusUpdate: ({ orderId, status }) => {
+      console.log(`[WebSocket] Status do pedido ${orderId} atualizado para ${status}`);
+      // Invalidar query para atualizar lista
+      utils.buscazapIntegration.listOrders.invalidate();
+    },
+  });
 
   // Notificação sonora para novos pedidos
   const pendingCount = orders?.filter(o => o.status === "open").length || 0;
