@@ -1489,3 +1489,23 @@ export async function getCompanyRatingStats(companyId: number) {
     distribution,
   };
 }
+
+// ==================== USUÁRIOS ====================
+
+export async function getUserById(userId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  try {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, parseInt(userId)))
+      .limit(1);
+    
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.log('[Database] Error getting user by id:', error);
+    return null;
+  }
+}

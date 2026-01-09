@@ -954,6 +954,31 @@ export const appRouter = router({
         return await db.getCompanyRatingStats(input.companyId);
       }),
   }),
+
+  // ==================== VERIFICAÇÃO DE PLANO ====================
+  plan: router({
+    // Verificar se usuário tem plano ativo
+    checkPlan: publicProcedure
+      .input(z.object({ userId: z.string() }))
+      .query(async ({ input }) => {
+        const user = await db.getUserById(input.userId);
+        if (!user) {
+          return { hasActivePlan: false, message: "Usuário não encontrado" };
+        }
+
+        // Verificar se o usuário tem plano destaque ativo
+        const hasActivePlan = user.planType === 'destaque' && 
+                              user.planExpiresAt && 
+                              new Date(user.planExpiresAt) > new Date();
+
+        return { 
+          hasActivePlan,
+          planType: user.planType || null,
+          planExpiresAt: user.planExpiresAt || null,
+          message: hasActivePlan ? "Plano ativo" : "Sem plano ativo"
+        };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
