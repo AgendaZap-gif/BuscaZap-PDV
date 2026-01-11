@@ -18,6 +18,8 @@ import BuscaZapOrders from "./pages/BuscaZapOrders";
 import BuscaZapStats from "./pages/BuscaZapStats";
 import OrderChat from "./pages/OrderChat";
 import Ratings from "./pages/Ratings";
+import DeliveryControl from "./pages/DeliveryControl";
+import ManageDrivers from "./pages/ManageDrivers";
 
 function Router() {
   return (
@@ -32,6 +34,8 @@ function Router() {
       <Route path="/buscazap-stats" component={BuscaZapStats} />
       <Route path="/chat/:orderId" component={OrderChat} />
       <Route path="/ratings" component={Ratings} />
+      <Route path="/delivery-control" component={DeliveryControl} />
+      <Route path="/manage-drivers" component={ManageDrivers} />
       <Route path="/select-company" component={SelectCompany} />
       <Route path={"/cashier"} component={Cashier} />
       <Route path={"/cash-register"} component={CashRegister} />

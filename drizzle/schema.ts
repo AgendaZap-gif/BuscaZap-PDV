@@ -9,7 +9,7 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin", "waiter", "cashier", "manager", "kitchen"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin", "waiter", "cashier", "manager", "kitchen", "admin_global", "delivery_driver"]).default("user").notNull(),
   companyId: int("companyId"), // Empresa associada ao usuário
   planType: varchar("planType", { length: 50 }), // Tipo de plano: destaque, basico, etc
   planExpiresAt: timestamp("planExpiresAt"), // Data de expiração do plano
@@ -319,3 +319,34 @@ export const orderRatings = mysqlTable("order_ratings", {
 
 export type OrderRating = typeof orderRatings.$inferSelect;
 export type InsertOrderRating = typeof orderRatings.$inferInsert;
+
+/**
+ * Company Delivery Settings - Configurações de delivery por empresa
+ */
+export const companyDeliverySettings = mysqlTable("company_delivery_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull().unique(),
+  isOnPedija: boolean("isOnPedija").default(false).notNull(), // Empresa ativa no PediJá
+  isOnlineForOrders: boolean("isOnlineForOrders").default(false).notNull(), // Online para pedidos (controlado via PDV)
+  hasOwnDrivers: boolean("hasOwnDrivers").default(false).notNull(), // Tem entregadores próprios
+  maxDrivers: int("maxDrivers").default(0).notNull(), // Limite de entregadores
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CompanyDeliverySetting = typeof companyDeliverySettings.$inferSelect;
+export type InsertCompanyDeliverySetting = typeof companyDeliverySettings.$inferInsert;
+
+/**
+ * Company Drivers - Entregadores próprios por empresa
+ */
+export const companyDrivers = mysqlTable("company_drivers", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  driverId: int("driverId").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CompanyDriver = typeof companyDrivers.$inferSelect;
+export type InsertCompanyDriver = typeof companyDrivers.$inferInsert;

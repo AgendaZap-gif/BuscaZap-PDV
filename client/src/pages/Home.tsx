@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLoginUrl } from "@/const";
-import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone, Star } from "lucide-react";
+import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone, Star, Bike, Users } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Home() {
@@ -111,6 +111,20 @@ export default function Home() {
       icon: Star,
       path: "/ratings",
       color: "bg-yellow-500",
+    },
+    {
+      title: "Controle de Delivery",
+      description: "Gerenciar status online do PediJá",
+      icon: Bike,
+      path: "/delivery-control",
+      color: "bg-green-600",
+    },
+    {
+      title: "Entregadores Próprios",
+      description: "Gerenciar entregadores exclusivos",
+      icon: Users,
+      path: "/manage-drivers",
+      color: "bg-blue-600",
     },
   ];
 

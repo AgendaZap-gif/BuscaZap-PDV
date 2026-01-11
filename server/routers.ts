@@ -955,6 +955,146 @@ export const appRouter = router({
       }),
   }),
 
+  // ==================== DELIVERY E ENTREGADORES PRÓPRIOS ====================
+  delivery: router({
+    // Buscar configurações de delivery da empresa
+    getSettings: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getCompanyDeliverySettings(input.companyId);
+      }),
+    
+    // Ativar empresa no PediJá
+    activateOnPedija: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        // Verificar se é admin ou dono da empresa
+        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
+          throw new Error('Acesso negado');
+        }
+        
+        return await db.activateCompanyOnPedija(input.companyId);
+      }),
+    
+    // Desativar empresa do PediJá
+    deactivateFromPedija: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
+          throw new Error('Acesso negado');
+        }
+        
+        return await db.deactivateCompanyFromPedija(input.companyId);
+      }),
+    
+    // Ativar/desativar status online para pedidos (via PDV)
+    toggleOnlineStatus: protectedProcedure
+      .input(z.object({
+        companyId: z.number(),
+        isOnline: z.boolean(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
+          throw new Error('Acesso negado');
+        }
+        
+        return await db.toggleCompanyOnlineStatus(input.companyId, input.isOnline);
+      }),
+    
+    // Buscar empresas online no PediJá
+    getOnlineCompanies: publicProcedure
+      .input(z.object({
+        cityId: z.number().optional(),
+        neighborhood: z.string().optional(),
+      }))
+      .query(async ({ input }) => {
+        return await db.getOnlineCompaniesForDelivery(input.cityId, input.neighborhood);
+      }),
+    
+    // Adicionar entregador próprio
+    addDriver: protectedProcedure
+      .input(z.object({
+        companyId: z.number(),
+        driverId: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
+          throw new Error('Acesso negado');
+        }
+        
+        return await db.addCompanyDriver(input.companyId, input.driverId);
+      }),
+    
+    // Remover entregador próprio
+    removeDriver: protectedProcedure
+      .input(z.object({
+        companyId: z.number(),
+        driverId: z.number(),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
+          throw new Error('Acesso negado');
+        }
+        
+        return await db.removeCompanyDriver(input.companyId, input.driverId);
+      }),
+    
+    // Buscar entregadores da empresa
+    getDrivers: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
+          throw new Error('Acesso negado');
+        }
+        
+        return await db.getCompanyDrivers(input.companyId);
+      }),
+    
+    // Buscar pedidos para entregador próprio
+    getOrdersForDriver: protectedProcedure
+      .query(async ({ ctx }) => {
+        if (ctx.user?.role !== 'delivery_driver') {
+          throw new Error('Acesso negado');
+        }
+        
+        return await db.getOrdersForCompanyDriver(ctx.user.id);
+      }),
+    
+    // Habilitar entregadores próprios no plano
+    enableOwnDrivers: protectedProcedure
+      .input(z.object({
+        companyId: z.number(),
+        maxDrivers: z.number().min(1).max(50),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        // Apenas admin global pode habilitar
+        if (ctx.user?.role !== 'admin_global') {
+          throw new Error('Acesso negado');
+        }
+        
+        return await db.upsertCompanyDeliverySettings({
+          companyId: input.companyId,
+          hasOwnDrivers: true,
+          maxDrivers: input.maxDrivers,
+        });
+      }),
+    
+    // Desabilitar entregadores próprios
+    disableOwnDrivers: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user?.role !== 'admin_global') {
+          throw new Error('Acesso negado');
+        }
+        
+        return await db.upsertCompanyDeliverySettings({
+          companyId: input.companyId,
+          hasOwnDrivers: false,
+          maxDrivers: 0,
+        });
+      }),
+  }),
+
   // ==================== VERIFICAÇÃO DE PLANO ====================
   plan: router({
     // Verificar se usuário tem plano ativo

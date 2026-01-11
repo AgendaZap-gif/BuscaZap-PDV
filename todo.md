@@ -325,3 +325,79 @@
 - [x] Remover polling de chat (2s)
 - [x] Testar comunicação em tempo real
 - [x] Documentar uso do WebSocket
+
+
+
+## 🚚 SEPARAÇÃO GUIA COMERCIAL vs PEDIJÁ + ENTREGADORES PRÓPRIOS (v14)
+
+### Backend (Implementado)
+- [x] Schema: Tabela company_delivery_settings
+- [x] Schema: Tabela company_drivers
+- [x] Migration v14 criada (migration-delivery-own-drivers-v14.sql)
+- [x] Backend: 11 funções de banco de dados (db.ts)
+- [x] Backend: Router delivery com 11 endpoints tRPC
+- [x] Endpoint: getSettings (buscar configurações de delivery)
+- [x] Endpoint: activateOnPedija (ativar empresa no PediJá)
+- [x] Endpoint: deactivateFromPedija (desativar empresa do PediJá)
+- [x] Endpoint: toggleOnlineStatus (controlar status online via PDV)
+- [x] Endpoint: getOnlineCompanies (buscar empresas online)
+- [x] Endpoint: addDriver (adicionar entregador próprio)
+- [x] Endpoint: removeDriver (remover entregador próprio)
+- [x] Endpoint: getDrivers (listar entregadores da empresa)
+- [x] Endpoint: getOrdersForDriver (pedidos para entregador próprio)
+- [x] Endpoint: enableOwnDrivers (habilitar addon)
+- [x] Endpoint: disableOwnDrivers (desabilitar addon)
+- [x] Documentação completa (DELIVERY-ENTREGADORES-PROPRIOS-V14.md)
+- [x] Testes unitários (13 testes passando)
+- [x] Roles admin_global e delivery_driver adicionados ao schema
+
+### Frontend PDV (A Implementar)
+- [ ] Página: DeliveryControl.tsx (controle de status online)
+- [ ] Página: ManageDrivers.tsx (gerenciar entregadores próprios)
+- [ ] Botão na Home: Acessar controle de delivery
+- [ ] Botão na Home: Acessar gerenciamento de entregadores
+- [ ] Toggle grande e visível para status online
+- [ ] Estatísticas de pedidos do dia
+- [ ] Lista de entregadores com estatísticas
+- [ ] Formulário de adicionar entregador
+- [ ] Confirmação de remoção de entregador
+- [ ] Validação de limite de entregadores
+
+### Frontend App Mobile (A Implementar)
+- [ ] Tela: pedija-settings.tsx (ativar empresa no PediJá)
+- [ ] Tela: driver-panel-own.tsx (painel do entregador próprio)
+- [ ] Botão "Ativar no PediJá" no painel da empresa
+- [ ] Explicação dos benefícios do PediJá
+- [ ] Filtro de empresas online no PediJá
+- [ ] Separação visual entre Guia Comercial e PediJá
+- [ ] Painel do entregador próprio (ver apenas pedidos da sua empresa)
+- [ ] Notificações push para entregadores próprios
+
+### Sistema de Planos e Addons
+- [ ] Adicionar campo hasOwnDriversAddon nos planos
+- [ ] Adicionar campo ownDriversPrice nos planos
+- [ ] Adicionar campo maxOwnDrivers nos planos
+- [ ] Tela de compra de addon de entregadores
+- [ ] Cobrança automática do addon
+- [ ] Validação de limite de entregadores no plano
+
+### Integração e Testes
+- [ ] Aplicar migration v14 no banco do Railway
+- [ ] Testar ativação/desativação no PediJá
+- [ ] Testar toggle de status online
+- [ ] Testar adição/remoção de entregadores
+- [ ] Testar filtro de pedidos por empresa para entregadores próprios
+- [ ] Testar notificações para entregadores próprios
+- [ ] Vitest: Testes unitários para endpoints de delivery
+- [ ] Vitest: Testes unitários para entregadores próprios
+
+
+### Implementação Imediata (Próximos Passos)
+- [x] Aplicar migration v14 no banco do Railway (script SQL criado)
+- [x] Criar página DeliveryControl.tsx no PDV
+- [x] Criar página ManageDrivers.tsx no PDV
+- [x] Adicionar sistema de preços editáveis para addon de entregadores (padrão R$ 49/mês)
+- [x] Adicionar botões na Home do PDV para acessar delivery e entregadores
+- [x] Adicionar rotas no App.tsx
+- [ ] Enviar código para repositório GitHub BuscaZap-PDV
+- [ ] Configurar deploy automático no Railway

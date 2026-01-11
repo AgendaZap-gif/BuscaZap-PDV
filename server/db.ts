@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull, gte, lte, ne } from "drizzle-orm";
+import { eq, and, desc, isNull, gte, lte, ne, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -19,6 +19,8 @@ import {
   deliveryRequests,
   chatMessages,
   orderRatings,
+  companyDeliverySettings,
+  companyDrivers,
   type Company,
   type Table,
   type Category,
@@ -1537,4 +1539,262 @@ export async function getUserById(userId: string) {
     console.log('[Database] Error getting user by id:', error);
     return null;
   }
+}
+
+// ==================== DELIVERY E ENTREGADORES PRÓPRIOS ====================
+
+export async function getCompanyDeliverySettings(companyId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db
+    .select()
+    .from(companyDeliverySettings)
+    .where(eq(companyDeliverySettings.companyId, companyId))
+    .limit(1);
+
+  if (result.length === 0) {
+    // Retornar configuração padrão se não existir
+    return {
+      id: 0,
+      companyId,
+      isOnPedija: false,
+      isOnlineForOrders: false,
+      hasOwnDrivers: false,
+      maxDrivers: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  return result[0];
+}
+
+export async function activateCompanyOnPedija(companyId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Verificar se já existe configuração
+  const existing = await db
+    .select()
+    .from(companyDeliverySettings)
+    .where(eq(companyDeliverySettings.companyId, companyId))
+    .limit(1);
+
+  if (existing.length > 0) {
+    // Atualizar
+    await db
+      .update(companyDeliverySettings)
+      .set({ isOnPedija: true, updatedAt: new Date() })
+      .where(eq(companyDeliverySettings.companyId, companyId));
+  } else {
+    // Inserir
+    await db.insert(companyDeliverySettings).values({
+      companyId,
+      isOnPedija: true,
+      isOnlineForOrders: false,
+      hasOwnDrivers: false,
+      maxDrivers: 0,
+    });
+  }
+
+  return { success: true };
+}
+
+export async function deactivateCompanyFromPedija(companyId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(companyDeliverySettings)
+    .set({ isOnPedija: false, isOnlineForOrders: false, updatedAt: new Date() })
+    .where(eq(companyDeliverySettings.companyId, companyId));
+
+  return { success: true };
+}
+
+export async function toggleCompanyOnlineStatus(companyId: number, isOnline: boolean) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Verificar se empresa está no PediJá
+  const settings = await getCompanyDeliverySettings(companyId);
+  if (!settings.isOnPedija) {
+    throw new Error('Empresa precisa estar ativa no PediJá');
+  }
+
+  await db
+    .update(companyDeliverySettings)
+    .set({ isOnlineForOrders: isOnline, updatedAt: new Date() })
+    .where(eq(companyDeliverySettings.companyId, companyId));
+
+  return { success: true, isOnline };
+}
+
+export async function getOnlineCompaniesForDelivery(cityId?: number, neighborhood?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Buscar empresas online
+  const conditions = [
+    eq(companyDeliverySettings.isOnPedija, true),
+    eq(companyDeliverySettings.isOnlineForOrders, true),
+  ];
+
+  const onlineSettings = await db
+    .select()
+    .from(companyDeliverySettings)
+    .where(and(...conditions));
+
+  const companyIds = onlineSettings.map(s => s.companyId);
+  if (companyIds.length === 0) return [];
+
+  // Buscar dados das empresas
+  // Nota: filtros de cityId e neighborhood devem ser implementados quando os campos existirem no schema
+  const companiesList = await db
+    .select()
+    .from(companies)
+    .where(sql`${companies.id} IN (${companyIds.join(', ')})`);
+
+  return companiesList;
+}
+
+export async function addCompanyDriver(companyId: number, driverId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Verificar se empresa tem permissão para entregadores próprios
+  const settings = await getCompanyDeliverySettings(companyId);
+  if (!settings.hasOwnDrivers) {
+    throw new Error('Empresa não tem permissão para entregadores próprios');
+  }
+
+  // Verificar limite de entregadores
+  const currentDrivers = await db
+    .select()
+    .from(companyDrivers)
+    .where(and(
+      eq(companyDrivers.companyId, companyId),
+      eq(companyDrivers.isActive, true)
+    ));
+
+  if (currentDrivers.length >= settings.maxDrivers) {
+    throw new Error(`Limite de ${settings.maxDrivers} entregadores atingido`);
+  }
+
+  // Adicionar entregador
+  await db.insert(companyDrivers).values({
+    companyId,
+    driverId,
+    isActive: true,
+  });
+
+  return { success: true };
+}
+
+export async function removeCompanyDriver(companyId: number, driverId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(companyDrivers)
+    .set({ isActive: false })
+    .where(and(
+      eq(companyDrivers.companyId, companyId),
+      eq(companyDrivers.driverId, driverId)
+    ));
+
+  return { success: true };
+}
+
+export async function getCompanyDrivers(companyId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const drivers = await db
+    .select({
+      id: companyDrivers.id,
+      driverId: companyDrivers.driverId,
+      driverName: users.name,
+      driverEmail: users.email,
+      isActive: companyDrivers.isActive,
+      createdAt: companyDrivers.createdAt,
+    })
+    .from(companyDrivers)
+    .innerJoin(users, eq(companyDrivers.driverId, users.id))
+    .where(eq(companyDrivers.companyId, companyId));
+
+  return drivers;
+}
+
+export async function getOrdersForCompanyDriver(driverId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Buscar empresa do entregador
+  const driverCompany = await db
+    .select()
+    .from(companyDrivers)
+    .where(and(
+      eq(companyDrivers.driverId, driverId),
+      eq(companyDrivers.isActive, true)
+    ))
+    .limit(1);
+
+  if (driverCompany.length === 0) {
+    return [];
+  }
+
+  const companyId = driverCompany[0].companyId;
+
+  // Buscar pedidos da empresa
+  const ordersList = await db
+    .select()
+    .from(orders)
+    .where(and(
+      eq(orders.companyId, companyId),
+      sql`${orders.status} IN ('accepted', 'preparing', 'ready', 'out_for_delivery')`
+    ))
+    .orderBy(desc(orders.createdAt));
+
+  return ordersList;
+}
+
+export async function upsertCompanyDeliverySettings(data: {
+  companyId: number;
+  hasOwnDrivers: boolean;
+  maxDrivers: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Verificar se já existe
+  const existing = await db
+    .select()
+    .from(companyDeliverySettings)
+    .where(eq(companyDeliverySettings.companyId, data.companyId))
+    .limit(1);
+
+  if (existing.length > 0) {
+    // Atualizar
+    await db
+      .update(companyDeliverySettings)
+      .set({
+        hasOwnDrivers: data.hasOwnDrivers,
+        maxDrivers: data.maxDrivers,
+        updatedAt: new Date(),
+      })
+      .where(eq(companyDeliverySettings.companyId, data.companyId));
+  } else {
+    // Inserir
+    await db.insert(companyDeliverySettings).values({
+      companyId: data.companyId,
+      isOnPedija: false,
+      isOnlineForOrders: false,
+      hasOwnDrivers: data.hasOwnDrivers,
+      maxDrivers: data.maxDrivers,
+    });
+  }
+
+  return { success: true };
 }
