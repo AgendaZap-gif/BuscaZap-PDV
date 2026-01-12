@@ -8,6 +8,7 @@ export const users = mysqlTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  password: varchar("password", { length: 255 }), // Hash da senha para login direto
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin", "waiter", "cashier", "manager", "kitchen", "admin_global", "delivery_driver"]).default("user").notNull(),
   companyId: int("companyId"), // Empresa associada ao usuário

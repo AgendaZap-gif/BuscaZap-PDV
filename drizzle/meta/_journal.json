@@ -57,6 +57,13 @@
       "when": 1768144592422,
       "tag": "0007_certain_raza",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1768254351958,
+      "tag": "0008_spooky_katie_power",
+      "breakpoints": true
     }
   ]
 }
