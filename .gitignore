@@ -105,3 +105,8 @@ temp/
 *.db
 *.sqlite
 *.sqlite3
+
+# Manus legacy files
+.manus/
+*.backup
+server/_core/oauth.ts.backup

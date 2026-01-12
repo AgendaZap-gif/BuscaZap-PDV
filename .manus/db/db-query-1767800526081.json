@@ -1,9 +1,0 @@
-{
-  "query": "CREATE TABLE IF NOT EXISTS chat_messages (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  orderId INT NOT NULL,\n  senderId INT NOT NULL,\n  senderType ENUM('customer', 'business') NOT NULL,\n  message TEXT NOT NULL,\n  isRead BOOLEAN DEFAULT FALSE NOT NULL,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  INDEX idx_order (orderId),\n  INDEX idx_created (createdAt)\n);\n\nCREATE TABLE IF NOT EXISTS order_ratings (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  orderId INT NOT NULL UNIQUE,\n  customerId INT NOT NULL,\n  companyId INT NOT NULL,\n  rating INT NOT NULL,\n  comment TEXT,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  INDEX idx_company (companyId),\n  INDEX idx_rating (rating)\n);",
-  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2qhSSFP4WQwHFmf.de20c608a165 --database NwfRG23uTZjNkVH35w5GRb --execute CREATE TABLE IF NOT EXISTS chat_messages (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  orderId INT NOT NULL,\n  senderId INT NOT NULL,\n  senderType ENUM('customer', 'business') NOT NULL,\n  message TEXT NOT NULL,\n  isRead BOOLEAN DEFAULT FALSE NOT NULL,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  INDEX idx_order (orderId),\n  INDEX idx_created (createdAt)\n);\n\nCREATE TABLE IF NOT EXISTS order_ratings (\n  id INT AUTO_INCREMENT PRIMARY KEY,\n  orderId INT NOT NULL UNIQUE,\n  customerId INT NOT NULL,\n  companyId INT NOT NULL,\n  rating INT NOT NULL,\n  comment TEXT,\n  createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,\n  INDEX idx_company (companyId),\n  INDEX idx_rating (rating)\n);",
-  "rows": [],
-  "messages": [],
-  "stdout": "",
-  "stderr": "",
-  "execution_time_ms": 308
-}
