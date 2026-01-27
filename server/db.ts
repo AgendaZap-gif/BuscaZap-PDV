@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull, gte, lte, ne, sql, inArray } from "drizzle-orm";
+import { eq, and, asc, desc, isNull, gte, lte, ne, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -21,6 +21,7 @@ import {
   orderRatings,
   companyDeliverySettings,
   companyDrivers,
+  externalPlatformIntegrations,
   type Company,
   type Table,
   type Category,
@@ -483,6 +484,56 @@ export async function getDeliveryRequestById(requestId: number) {
   return result[0];
 }
 
+/**
+ * Pool global (cidade): pedidos pendentes priorizados.
+ * Importante: NÃO mistura solicitações marcadas para entregadores próprios.
+ *
+ * Nota: `cityId` ainda não é aplicado porque `companies` não tem `cityId` no schema atual.
+ */
+export async function getPendingOrdersPrioritized(cityId?: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // cityId reservado para quando `companies.cityId` existir
+  void cityId;
+
+  const rows = await db
+    .select({
+      id: deliveryRequests.id,
+      companyId: deliveryRequests.companyId,
+      orderId: deliveryRequests.orderId,
+      customerName: deliveryRequests.customerName,
+      customerPhone: deliveryRequests.customerPhone,
+      deliveryAddress: deliveryRequests.deliveryAddress,
+      deliveryFee: deliveryRequests.deliveryFee,
+      requestedAt: deliveryRequests.requestedAt,
+      companyName: companies.name,
+      pickupAddress: companies.address,
+    })
+    .from(deliveryRequests)
+    .innerJoin(companies, eq(deliveryRequests.companyId, companies.id))
+    .where(
+      and(
+        eq(deliveryRequests.status, "pending"),
+        isNull(deliveryRequests.deliveryPersonId),
+        // Não misturar com entregadores próprios
+        eq(deliveryRequests.deliveryType, "city")
+      )
+    )
+    .orderBy(asc(deliveryRequests.requestedAt));
+
+  const now = Date.now();
+  return rows.map((r) => {
+    const requestedAtMs = new Date(r.requestedAt as any).getTime();
+    const waitingTimeMinutes = Math.max(0, Math.floor((now - requestedAtMs) / 60000));
+
+    return {
+      ...r,
+      waitingTimeMinutes,
+    };
+  });
+}
+
 
 // ==================== PRODUCTS CRUD ====================
 
@@ -822,6 +873,195 @@ export async function createOrderFromBuscaZap(data: {
   }
 
   return { orderId, orderNumber };
+}
+
+// ==================== INTEGRAÇÃO PLATAFORMAS EXTERNAS (UNIFICADO) ====================
+
+/**
+ * Criar pedido vindo de qualquer plataforma externa (Pedijá, Iffod, 99Food, etc.)
+ * Função genérica que normaliza pedidos de diferentes plataformas
+ */
+export async function createOrderFromExternalPlatform(data: {
+  companyId: number;
+  platform: "pedija" | "iffod" | "99food" | "rappi" | "uber_eats" | "ifood" | "other";
+  externalOrderId: string; // ID do pedido na plataforma externa
+  customerName: string;
+  customerPhone: string;
+  items: Array<{
+    productId?: number; // Se não tiver, tentar buscar por nome
+    productName: string; // Nome do produto na plataforma externa
+    quantity: number;
+    unitPrice: string;
+    notes?: string;
+  }>;
+  deliveryAddress?: string;
+  deliveryFee?: string;
+  subtotal?: string;
+  total?: string;
+  notes?: string;
+  paymentMethod?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Verificar se a integração está ativa
+  const integration = await db
+    .select()
+    .from(externalPlatformIntegrations)
+    .where(
+      and(
+        eq(externalPlatformIntegrations.companyId, data.companyId),
+        eq(externalPlatformIntegrations.platform, data.platform),
+        eq(externalPlatformIntegrations.isActive, true)
+      )
+    )
+    .limit(1);
+
+  if (integration.length === 0) {
+    throw new Error(`Integração com ${data.platform} não está ativa para esta empresa`);
+  }
+
+  // Gerar número do pedido com prefixo da plataforma
+  const platformPrefix: Record<string, string> = {
+    pedija: "PJ",
+    iffod: "IF",
+    "99food": "99",
+    rappi: "RP",
+    uber_eats: "UE",
+    ifood: "IFD",
+    other: "EXT",
+  };
+  const prefix = platformPrefix[data.platform] || "EXT";
+  const orderNumber = `${prefix}-${Date.now().toString().slice(-6)}`;
+
+  // Calcular valores se não fornecidos
+  const subtotal = data.subtotal
+    ? parseFloat(data.subtotal)
+    : data.items.reduce((sum, item) => sum + parseFloat(item.unitPrice) * item.quantity, 0);
+  
+  const deliveryFee = data.deliveryFee ? parseFloat(data.deliveryFee) : 0;
+  const total = data.total ? parseFloat(data.total) : subtotal + deliveryFee;
+
+  // Criar pedido
+  const [order] = await db.insert(orders).values({
+    companyId: data.companyId,
+    orderNumber,
+    type: "delivery",
+    tableId: null,
+    waiterId: null,
+    customerName: data.customerName,
+    customerPhone: data.customerPhone,
+    status: "open",
+    subtotal: subtotal.toFixed(2),
+    serviceCharge: deliveryFee.toFixed(2),
+    discount: "0.00",
+    total: total.toFixed(2),
+    notes: data.notes || null,
+    deliveryOrderId: data.externalOrderId,
+    externalPlatform: data.platform,
+    source: data.platform === "pedija" ? "pedija" : 
+            data.platform === "iffod" ? "iffod" :
+            data.platform === "99food" ? "99food" :
+            data.platform === "rappi" ? "rappi" :
+            data.platform === "uber_eats" ? "uber_eats" :
+            data.platform === "ifood" ? "ifood" : "other",
+    closedAt: null,
+  });
+
+  const orderId = order.insertId;
+
+  // Adicionar itens (tentar mapear produtos por nome se productId não fornecido)
+  for (const item of data.items) {
+    let productId = item.productId;
+
+    // Se não tiver productId, tentar buscar por nome
+    if (!productId) {
+      const product = await db
+        .select()
+        .from(products)
+        .where(
+          and(
+            eq(products.companyId, data.companyId),
+            eq(products.name, item.productName),
+            eq(products.isActive, true)
+          )
+        )
+        .limit(1);
+      
+      if (product.length > 0) {
+        productId = product[0].id;
+      } else {
+        // Se não encontrar, criar produto temporário ou pular (depende da estratégia)
+        console.warn(`[External Platform] Produto não encontrado: ${item.productName} para empresa ${data.companyId}`);
+        // Por enquanto, vamos pular itens sem produto correspondente
+        continue;
+      }
+    }
+
+    const itemSubtotal = parseFloat(item.unitPrice) * item.quantity;
+    
+    await db.insert(orderItems).values({
+      orderId,
+      productId,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      subtotal: itemSubtotal.toFixed(2),
+      notes: item.notes || null,
+      status: "pending",
+      productionSector: null,
+    });
+  }
+
+  // Auto-aceitar se configurado
+  if (integration[0].settings?.autoAccept) {
+    await db
+      .update(orders)
+      .set({ status: "sent_to_kitchen" })
+      .where(eq(orders.id, orderId));
+  }
+
+  // Auto-imprimir se configurado
+  if (integration[0].settings?.autoPrint) {
+    try {
+      await db.printOrder(orderId);
+    } catch (error) {
+      console.log(`[External Platform] Falha ao imprimir pedido ${orderId}:`, error);
+    }
+  }
+
+  // Emitir evento WebSocket de novo pedido
+  try {
+    const { emitNewOrder } = await import("./_core/websocket");
+    const fullOrder = await getOrderById(orderId);
+    if (fullOrder) {
+      emitNewOrder(data.companyId, fullOrder);
+    }
+  } catch (error) {
+    console.log('[WebSocket] Failed to emit new order event:', error);
+  }
+
+  return { orderId, orderNumber };
+}
+
+/**
+ * Listar todos os pedidos externos (de todas as plataformas) pendentes
+ */
+export async function getAllExternalOrders(companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.companyId, companyId),
+        sql`${orders.source} IN ('pedija', 'iffod', '99food', 'rappi', 'uber_eats', 'ifood', 'other', 'buscazap')`,
+        ne(orders.status, "closed"),
+        ne(orders.status, "cancelled")
+      )
+    )
+    .orderBy(desc(orders.createdAt));
 }
 
 /**
@@ -1807,6 +2047,107 @@ export async function upsertCompanyDeliverySettings(data: {
       maxDrivers: data.maxDrivers,
     });
   }
+
+  return { success: true };
+}
+
+// ==================== GERENCIAMENTO DE INTEGRAÇÕES EXTERNAS ====================
+
+/**
+ * Criar ou atualizar integração com plataforma externa
+ */
+export async function upsertExternalPlatformIntegration(data: {
+  companyId: number;
+  platform: "pedija" | "iffod" | "99food" | "rappi" | "uber_eats" | "ifood" | "other";
+  apiKey?: string;
+  apiSecret?: string;
+  webhookSecret?: string;
+  settings?: {
+    autoAccept?: boolean;
+    autoPrint?: boolean;
+    notificationSound?: boolean;
+    [key: string]: any;
+  };
+  isActive?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await db
+    .select()
+    .from(externalPlatformIntegrations)
+    .where(
+      and(
+        eq(externalPlatformIntegrations.companyId, data.companyId),
+        eq(externalPlatformIntegrations.platform, data.platform)
+      )
+    )
+    .limit(1);
+
+  const updateData: any = {
+    updatedAt: new Date(),
+  };
+
+  if (data.apiKey !== undefined) updateData.apiKey = data.apiKey;
+  if (data.apiSecret !== undefined) updateData.apiSecret = data.apiSecret;
+  if (data.webhookSecret !== undefined) updateData.webhookSecret = data.webhookSecret;
+  if (data.settings !== undefined) updateData.settings = data.settings;
+  if (data.isActive !== undefined) updateData.isActive = data.isActive;
+
+  if (existing.length > 0) {
+    await db
+      .update(externalPlatformIntegrations)
+      .set(updateData)
+      .where(eq(externalPlatformIntegrations.id, existing[0].id));
+  } else {
+    await db.insert(externalPlatformIntegrations).values({
+      companyId: data.companyId,
+      platform: data.platform,
+      apiKey: data.apiKey || null,
+      apiSecret: data.apiSecret || null,
+      webhookSecret: data.webhookSecret || null,
+      settings: data.settings || {},
+      isActive: data.isActive !== undefined ? data.isActive : true,
+    });
+  }
+
+  return { success: true };
+}
+
+/**
+ * Listar integrações ativas de uma empresa
+ */
+export async function getExternalPlatformIntegrations(companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(externalPlatformIntegrations)
+    .where(eq(externalPlatformIntegrations.companyId, companyId))
+    .orderBy(desc(externalPlatformIntegrations.updatedAt));
+}
+
+/**
+ * Ativar/desativar integração
+ */
+export async function toggleExternalPlatformIntegration(
+  companyId: number,
+  platform: string,
+  isActive: boolean
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(externalPlatformIntegrations)
+    .set({ isActive, updatedAt: new Date() })
+    .where(
+      and(
+        eq(externalPlatformIntegrations.companyId, companyId),
+        eq(externalPlatformIntegrations.platform, platform as any)
+      )
+    );
 
   return { success: true };
 }

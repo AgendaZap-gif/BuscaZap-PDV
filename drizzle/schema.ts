@@ -120,8 +120,9 @@ export const orders = mysqlTable("orders", {
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0.00"),
   total: decimal("total", { precision: 10, scale: 2 }).default("0.00").notNull(),
   notes: text("notes"),
-  deliveryOrderId: varchar("deliveryOrderId", { length: 255 }), // ID do pedido no sistema de delivery
-  source: mysqlEnum("source", ["pdv", "buscazap"]).default("pdv").notNull(), // Origem do pedido
+  deliveryOrderId: varchar("deliveryOrderId", { length: 255 }), // ID do pedido no sistema de delivery externo
+  externalPlatform: varchar("externalPlatform", { length: 50 }), // Plataforma externa (pedija, iffod, 99food, etc.)
+  source: mysqlEnum("source", ["pdv", "buscazap", "pedija", "iffod", "99food", "rappi", "uber_eats", "ifood", "other"]).default("pdv").notNull(), // Origem do pedido
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   closedAt: timestamp("closedAt"),
@@ -276,6 +277,10 @@ export const deliveryRequests = mysqlTable("delivery_requests", {
   customerPhone: varchar("customerPhone", { length: 20 }).notNull(),
   deliveryAddress: text("deliveryAddress").notNull(),
   deliveryFee: decimal("deliveryFee", { precision: 10, scale: 2 }).notNull(),
+  // Roteamento de entrega:
+  // city = pool global (PediJá / sistema inteligente da cidade)
+  // company = entregadores próprios da empresa
+  deliveryType: mysqlEnum("deliveryType", ["city", "company"]).default("city").notNull(),
   status: mysqlEnum("status", ["pending", "accepted", "in_transit", "delivered", "cancelled"]).default("pending").notNull(),
   deliveryPersonId: int("deliveryPersonId"),
   deliveryPersonName: varchar("deliveryPersonName", { length: 255 }),
@@ -351,3 +356,30 @@ export const companyDrivers = mysqlTable("company_drivers", {
 
 export type CompanyDriver = typeof companyDrivers.$inferSelect;
 export type InsertCompanyDriver = typeof companyDrivers.$inferInsert;
+
+/**
+ * External Platform Integrations - Configurações de integração com plataformas externas
+ */
+export const externalPlatformIntegrations = mysqlTable("external_platform_integrations", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  platform: mysqlEnum("platform", ["pedija", "iffod", "99food", "rappi", "uber_eats", "ifood", "other"]).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  // Credenciais/API keys (criptografadas em produção)
+  apiKey: varchar("apiKey", { length: 255 }),
+  apiSecret: varchar("apiSecret", { length: 255 }),
+  webhookUrl: varchar("webhookUrl", { length: 500 }), // URL do webhook que a plataforma deve chamar
+  webhookSecret: varchar("webhookSecret", { length: 255 }), // Secret para validar webhooks
+  // Configurações específicas da plataforma (JSON)
+  settings: json("settings").$type<{
+    autoAccept?: boolean;
+    autoPrint?: boolean;
+    notificationSound?: boolean;
+    [key: string]: any;
+  }>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ExternalPlatformIntegration = typeof externalPlatformIntegrations.$inferSelect;
+export type InsertExternalPlatformIntegration = typeof externalPlatformIntegrations.$inferInsert;

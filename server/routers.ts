@@ -437,10 +437,17 @@ export const appRouter = router({
           customerPhone: z.string(),
           deliveryAddress: z.string(),
           deliveryFee: z.string(),
+          // Se a empresa tiver entregadores próprios, o PDV pode optar por
+          // usar entregadores próprios (true) ou o pool global da cidade (false/undefined).
+          useOwnDrivers: z.boolean().optional(),
           notes: z.string().optional(),
         })
       )
       .mutation(async ({ input }) => {
+        const settings = await db.getCompanyDeliverySettings(input.companyId);
+        const deliveryType =
+          settings.hasOwnDrivers && input.useOwnDrivers === true ? "company" : "city";
+
         const id = await db.createDeliveryRequest({
           companyId: input.companyId,
           orderId: input.orderId,
@@ -448,6 +455,7 @@ export const appRouter = router({
           customerPhone: input.customerPhone,
           deliveryAddress: input.deliveryAddress,
           deliveryFee: input.deliveryFee,
+          deliveryType,
           status: "pending",
           deliveryPersonId: null,
           deliveryPersonName: null,
@@ -484,6 +492,20 @@ export const appRouter = router({
         return await db.getDeliveryRequestById(input.requestId);
       }),
    }),
+
+  // ==================== SMART DELIVERY (POOL GLOBAL) ====================
+  smartDelivery: router({
+    // Lista priorizada do pool global (cidade). Não mistura com entregadores próprios.
+    getPendingOrdersPrioritized: protectedProcedure
+      .input(z.object({ cityId: z.number().optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "delivery_driver" && ctx.user?.role !== "admin_global") {
+          throw new Error("Acesso negado");
+        }
+
+        return await db.getPendingOrdersPrioritized(input?.cityId);
+      }),
+  }),
 
   // Notificações
   notifications: router({
@@ -792,6 +814,207 @@ export const appRouter = router({
         // Notificar cliente sobre mudança de status
         await db.notifyOrderStatus(input.orderId, input.status);
         return result;
+      }),
+  }),
+
+  // ==================== INTEGRAÇÃO PLATAFORMAS EXTERNAS (UNIFICADO) ====================
+  externalPlatforms: router({
+    // Receber pedido de qualquer plataforma externa (webhook genérico)
+    receiveOrder: publicProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          platform: z.enum(["pedija", "iffod", "99food", "rappi", "uber_eats", "ifood", "other"]),
+          externalOrderId: z.string(),
+          customerName: z.string(),
+          customerPhone: z.string(),
+          items: z.array(
+            z.object({
+              productId: z.number().optional(),
+              productName: z.string(),
+              quantity: z.number(),
+              unitPrice: z.string(),
+              notes: z.string().optional(),
+            })
+          ),
+          deliveryAddress: z.string().optional(),
+          deliveryFee: z.string().optional(),
+          subtotal: z.string().optional(),
+          total: z.string().optional(),
+          notes: z.string().optional(),
+          paymentMethod: z.string().optional(),
+          // Validação de webhook (opcional)
+          webhookSecret: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        // Validar webhook secret se fornecido
+        if (input.webhookSecret) {
+          const integration = await db.getExternalPlatformIntegrations(input.companyId);
+          const platformIntegration = integration.find((i) => i.platform === input.platform);
+          
+          if (platformIntegration?.webhookSecret && platformIntegration.webhookSecret !== input.webhookSecret) {
+            throw new Error("Webhook secret inválido");
+          }
+        }
+
+        return await db.createOrderFromExternalPlatform({
+          companyId: input.companyId,
+          platform: input.platform,
+          externalOrderId: input.externalOrderId,
+          customerName: input.customerName,
+          customerPhone: input.customerPhone,
+          items: input.items,
+          deliveryAddress: input.deliveryAddress,
+          deliveryFee: input.deliveryFee,
+          subtotal: input.subtotal,
+          total: input.total,
+          notes: input.notes,
+          paymentMethod: input.paymentMethod,
+        });
+      }),
+
+    // Webhook específico para Pedijá
+    receivePedijaOrder: publicProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          orderId: z.string(),
+          customer: z.object({
+            name: z.string(),
+            phone: z.string(),
+          }),
+          items: z.array(
+            z.object({
+              name: z.string(),
+              quantity: z.number(),
+              price: z.string(),
+              notes: z.string().optional(),
+            })
+          ),
+          delivery: z.object({
+            address: z.string(),
+            fee: z.string().optional(),
+          }),
+          total: z.string(),
+          notes: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await db.createOrderFromExternalPlatform({
+          companyId: input.companyId,
+          platform: "pedija",
+          externalOrderId: input.orderId,
+          customerName: input.customer.name,
+          customerPhone: input.customer.phone,
+          items: input.items.map((item) => ({
+            productName: item.name,
+            quantity: item.quantity,
+            unitPrice: item.price,
+            notes: item.notes,
+          })),
+          deliveryAddress: input.delivery.address,
+          deliveryFee: input.delivery.fee,
+          total: input.total,
+          notes: input.notes,
+        });
+      }),
+
+    // Webhook específico para Iffod
+    receiveIffodOrder: publicProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          orderId: z.string(),
+          customerName: z.string(),
+          customerPhone: z.string(),
+          items: z.array(
+            z.object({
+              name: z.string(),
+              quantity: z.number(),
+              price: z.string(),
+            })
+          ),
+          deliveryAddress: z.string(),
+          total: z.string(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        return await db.createOrderFromExternalPlatform({
+          companyId: input.companyId,
+          platform: "iffod",
+          externalOrderId: input.orderId,
+          customerName: input.customerName,
+          customerPhone: input.customerPhone,
+          items: input.items.map((item) => ({
+            productName: item.name,
+            quantity: item.quantity,
+            unitPrice: item.price,
+          })),
+          deliveryAddress: input.deliveryAddress,
+          total: input.total,
+        });
+      }),
+
+    // Listar todos os pedidos externos (unificado)
+    listAllExternalOrders: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input }) => {
+        return await db.getAllExternalOrders(input.companyId);
+      }),
+
+    // Gerenciar integrações
+    upsertIntegration: protectedProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          platform: z.enum(["pedija", "iffod", "99food", "rappi", "uber_eats", "ifood", "other"]),
+          apiKey: z.string().optional(),
+          apiSecret: z.string().optional(),
+          webhookSecret: z.string().optional(),
+          settings: z
+            .object({
+              autoAccept: z.boolean().optional(),
+              autoPrint: z.boolean().optional(),
+              notificationSound: z.boolean().optional(),
+            })
+            .optional(),
+          isActive: z.boolean().optional(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user?.role !== "admin_global" && ctx.user?.companyId !== input.companyId) {
+          throw new Error("Acesso negado");
+        }
+        return await db.upsertExternalPlatformIntegration(input);
+      }),
+
+    listIntegrations: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.user?.role !== "admin_global" && ctx.user?.companyId !== input.companyId) {
+          throw new Error("Acesso negado");
+        }
+        return await db.getExternalPlatformIntegrations(input.companyId);
+      }),
+
+    toggleIntegration: protectedProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          platform: z.string(),
+          isActive: z.boolean(),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.user?.role !== "admin_global" && ctx.user?.companyId !== input.companyId) {
+          throw new Error("Acesso negado");
+        }
+        return await db.toggleExternalPlatformIntegration(
+          input.companyId,
+          input.platform,
+          input.isActive
+        );
       }),
   }),
 

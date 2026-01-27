@@ -19,7 +19,8 @@ export default function BuscaZapOrders() {
 
   // Assumindo companyId 1 por enquanto - em produção virá do contexto do usuário
   const companyId = 1;
-  const { data: orders, isLoading } = trpc.buscazapIntegration.listOrders.useQuery(
+  // Usar rota unificada que lista pedidos de todas as plataformas externas
+  const { data: orders, isLoading } = trpc.externalPlatforms.listAllExternalOrders.useQuery(
     { companyId },
     { refetchInterval: false } // Desabilitar polling, usar WebSocket
   );
@@ -30,12 +31,12 @@ export default function BuscaZapOrders() {
     onNewOrder: (order) => {
       console.log('[WebSocket] Novo pedido recebido:', order);
       // Invalidar query para atualizar lista
-      utils.buscazapIntegration.listOrders.invalidate();
+      utils.externalPlatforms.listAllExternalOrders.invalidate();
     },
     onOrderStatusUpdate: ({ orderId, status }) => {
       console.log(`[WebSocket] Status do pedido ${orderId} atualizado para ${status}`);
       // Invalidar query para atualizar lista
-      utils.buscazapIntegration.listOrders.invalidate();
+      utils.externalPlatforms.listAllExternalOrders.invalidate();
     },
   });
 
@@ -49,7 +50,7 @@ export default function BuscaZapOrders() {
         title: "Pedido Aceito",
         description: "O pedido foi aceito e enviado para a cozinha.",
       });
-      utils.buscazapIntegration.listOrders.invalidate();
+      utils.externalPlatforms.listAllExternalOrders.invalidate();
       setSelectedOrder(null);
     },
     onError: (error) => {
@@ -67,7 +68,7 @@ export default function BuscaZapOrders() {
         title: "Pedido Rejeitado",
         description: "O pedido foi rejeitado e o cliente será notificado.",
       });
-      utils.buscazapIntegration.listOrders.invalidate();
+      utils.externalPlatforms.listAllExternalOrders.invalidate();
       setShowRejectDialog(false);
       setSelectedOrder(null);
       setRejectReason("");
@@ -87,7 +88,7 @@ export default function BuscaZapOrders() {
         title: "Status Atualizado",
         description: "O status do pedido foi atualizado com sucesso.",
       });
-      utils.buscazapIntegration.listOrders.invalidate();
+      utils.externalPlatforms.listAllExternalOrders.invalidate();
     },
     onError: (error) => {
       toast({
@@ -127,6 +128,37 @@ export default function BuscaZapOrders() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
+  const getPlatformBadge = (source: string, externalPlatform?: string | null) => {
+    const platform = externalPlatform || source;
+    const platformNames: Record<string, string> = {
+      buscazap: "BuscaZap",
+      pedija: "Pedijá",
+      iffod: "Iffod",
+      "99food": "99Food",
+      rappi: "Rappi",
+      uber_eats: "Uber Eats",
+      ifood: "iFood",
+      other: "Outro",
+      pdv: "PDV",
+    };
+    const name = platformNames[platform] || platform;
+    const colors: Record<string, string> = {
+      buscazap: "bg-blue-500",
+      pedija: "bg-purple-500",
+      iffod: "bg-orange-500",
+      "99food": "bg-yellow-500",
+      rappi: "bg-green-500",
+      uber_eats: "bg-black",
+      ifood: "bg-red-500",
+      other: "bg-gray-500",
+    };
+    return (
+      <Badge className={colors[platform] || "bg-gray-500"} variant="default">
+        {name}
+      </Badge>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="container max-w-7xl py-8">
@@ -143,9 +175,9 @@ export default function BuscaZapOrders() {
   return (
     <div className="container max-w-7xl py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Pedidos BuscaZap</h1>
+        <h1 className="text-3xl font-bold">Pedidos Externos</h1>
         <p className="text-muted-foreground mt-2">
-          Gerencie pedidos recebidos do aplicativo BuscaZap
+          Gerencie pedidos recebidos de todas as plataformas (BuscaZap, Pedijá, Iffod, 99Food, Rappi, Uber Eats, iFood, etc.)
         </p>
       </div>
 
@@ -163,7 +195,10 @@ export default function BuscaZapOrders() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                    {getStatusBadge(order.status)}
+                    <div className="flex items-center gap-2">
+                      {getPlatformBadge(order.source, (order as any).externalPlatform)}
+                      {getStatusBadge(order.status)}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
@@ -243,7 +278,10 @@ export default function BuscaZapOrders() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                    {getStatusBadge(order.status)}
+                    <div className="flex items-center gap-2">
+                      {getPlatformBadge(order.source, (order as any).externalPlatform)}
+                      {getStatusBadge(order.status)}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
@@ -317,7 +355,7 @@ export default function BuscaZapOrders() {
             <Package className="h-12 w-12 text-muted-foreground mb-4" />
             <p className="text-lg font-medium">Nenhum pedido no momento</p>
             <p className="text-sm text-muted-foreground">
-              Novos pedidos do BuscaZap aparecerão aqui automaticamente
+              Novos pedidos de todas as plataformas aparecerão aqui automaticamente
             </p>
           </CardContent>
         </Card>
