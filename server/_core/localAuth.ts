@@ -126,13 +126,13 @@ export function registerLocalAuthRoutes(app: Express) {
         lastSignedIn: new Date(),
       });
 
-      // Create session token
+      // Create session token (cookie for web + token for app Modo Garçom)
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || "",
         expiresInMs: ONE_YEAR_MS,
       });
 
-      // Set session cookie
+      // Set session cookie (PDV web)
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, {
         ...cookieOptions,
@@ -141,11 +141,13 @@ export function registerLocalAuthRoutes(app: Express) {
 
       res.json({
         success: true,
+        token: sessionToken,
         user: {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
+          companyId: user.companyId ?? undefined,
         },
       });
     } catch (error) {

@@ -62,6 +62,14 @@ export function emitOrderStatusUpdate(companyId: number, orderId: number, status
   console.log(`[WebSocket] Emitted order-status-update to room: ${room}`);
 }
 
+// Emitir evento de pedido atualizado (ex.: novo item adicionado pelo garçom no app)
+export function emitOrderUpdated(companyId: number, orderId: number) {
+  if (!io) return;
+  const room = `company-${companyId}`;
+  io.to(room).emit("order-updated", { orderId });
+  console.log(`[WebSocket] Emitted order-updated to room: ${room}`);
+}
+
 // Emitir evento de nova mensagem de chat
 export function emitNewChatMessage(orderId: number, message: any) {
   if (!io) return;

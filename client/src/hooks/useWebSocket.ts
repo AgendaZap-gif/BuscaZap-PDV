@@ -10,12 +10,21 @@ interface UseWebSocketOptions {
   onNewRating?: (rating: any) => void;
 }
 
+/** URL base da API (mesmo origin em dev/prod quando PDV e API estão juntos) */
+function getSocketUrl(): string {
+  if (typeof window === "undefined") return "";
+  const url = import.meta.env.VITE_API_URL ?? window.location.origin;
+  return url;
+}
+
 export function useWebSocket(options: UseWebSocketOptions) {
   const socketRef = useRef<Socket | null>(null);
+  const optsRef = useRef(options);
+  optsRef.current = options;
 
   useEffect(() => {
-    // Conectar ao WebSocket
-    const socket = io({
+    const url = getSocketUrl();
+    const socket = io(url || undefined, {
       path: "/socket.io/",
       transports: ["websocket", "polling"],
     });
@@ -24,42 +33,31 @@ export function useWebSocket(options: UseWebSocketOptions) {
 
     socket.on("connect", () => {
       console.log("[WebSocket] Connected:", socket.id);
-
-      // Entrar na sala da empresa se companyId fornecido
-      if (options.companyId) {
-        socket.emit("join-company", options.companyId);
-      }
-
-      // Entrar na sala do pedido se orderId fornecido
-      if (options.orderId) {
-        socket.emit("join-order", options.orderId);
-      }
+      const { companyId, orderId } = optsRef.current;
+      if (companyId) socket.emit("join-company", companyId);
+      if (orderId) socket.emit("join-order", orderId);
     });
 
     socket.on("disconnect", () => {
       console.log("[WebSocket] Disconnected");
     });
 
-    // Registrar listeners de eventos
-    if (options.onNewOrder) {
-      socket.on("new-order", options.onNewOrder);
-    }
+    socket.on("new-order", (order: any) => {
+      optsRef.current.onNewOrder?.(order);
+    });
+    socket.on("order-status-update", (data: { orderId: number; status: string }) => {
+      optsRef.current.onOrderStatusUpdate?.(data);
+    });
+    socket.on("new-chat-message", (message: any) => {
+      optsRef.current.onNewChatMessage?.(message);
+    });
+    socket.on("new-rating", (rating: any) => {
+      optsRef.current.onNewRating?.(rating);
+    });
 
-    if (options.onOrderStatusUpdate) {
-      socket.on("order-status-update", options.onOrderStatusUpdate);
-    }
-
-    if (options.onNewChatMessage) {
-      socket.on("new-chat-message", options.onNewChatMessage);
-    }
-
-    if (options.onNewRating) {
-      socket.on("new-rating", options.onNewRating);
-    }
-
-    // Cleanup ao desmontar
     return () => {
       socket.disconnect();
+      socketRef.current = null;
     };
   }, [options.companyId, options.orderId]);
 

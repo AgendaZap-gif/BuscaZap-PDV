@@ -1,8 +1,8 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLoginUrl } from "@/const";
-import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone, Star, Bike, Users } from "lucide-react";
+import { getLoginUrl, getSiteSecretariaUrl } from "@/const";
+import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone, Star, Bike, Users, UserPlus, CalendarCheck } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Home() {
@@ -38,6 +38,14 @@ export default function Home() {
               onClick={() => (window.location.href = getLoginUrl())}
             >
               Fazer Login
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full mt-3"
+              size="lg"
+              onClick={() => window.open(getSiteSecretariaUrl(), "_blank", "noopener,noreferrer")}
+            >
+              Login Secretária – Gerenciar agenda pela web
             </Button>
             <p className="text-xs text-muted-foreground text-center mt-4">
               Use as mesmas credenciais do app BuscaZap
@@ -126,6 +134,21 @@ export default function Home() {
       path: "/manage-drivers",
       color: "bg-blue-600",
     },
+    {
+      title: "Gestão de Garçons",
+      description: "Criar login e senha para garçons usarem no app",
+      icon: UserPlus,
+      path: "/manage-waiters",
+      color: "bg-emerald-600",
+    },
+    {
+      title: "Área da Secretária",
+      description: "Login e gestão da agenda dos médicos pela página web (BuscaZap Brasil)",
+      icon: CalendarCheck,
+      path: "__site_secretaria__",
+      color: "bg-teal-600",
+      externalUrl: getSiteSecretariaUrl(),
+    },
   ];
 
   return (
@@ -143,7 +166,13 @@ export default function Home() {
             <Card
               key={mode.path}
               className="cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => setLocation(mode.path)}
+              onClick={() => {
+                if ((mode as { externalUrl?: string }).externalUrl) {
+                  window.open((mode as { externalUrl: string }).externalUrl, "_blank", "noopener,noreferrer");
+                } else {
+                  setLocation(mode.path);
+                }
+              }}
             >
               <CardHeader>
                 <div className={`w-12 h-12 ${mode.color} rounded-lg flex items-center justify-center mb-4`}>

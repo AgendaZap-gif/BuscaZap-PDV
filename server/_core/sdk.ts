@@ -112,8 +112,33 @@ class SDKServer {
     }
   }
 
+  /**
+   * Get Bearer token from Authorization header (for mobile app / Modo Garçom)
+   */
+  private getBearerToken(req: Request): string | undefined {
+    const auth = req.headers.authorization;
+    if (typeof auth === "string" && auth.startsWith("Bearer ")) {
+      return auth.slice(7).trim();
+    }
+    return undefined;
+  }
+
   async authenticateRequest(req: Request): Promise<User> {
-    // Regular authentication flow
+    // 1) Try Bearer token (Modo Garçom / app mobile)
+    const bearerToken = this.getBearerToken(req);
+    if (bearerToken) {
+      const session = await this.verifySession(bearerToken);
+      if (session) {
+        const user = await db.getUserByOpenId(session.openId);
+        if (user) {
+          await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
+          return user;
+        }
+      }
+      throw ForbiddenError("Invalid or expired token");
+    }
+
+    // 2) Cookie (PDV web)
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
@@ -126,12 +151,10 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, they need to login again
     if (!user) {
       throw ForbiddenError("User not found in database");
     }
 
-    // Update last signed in timestamp
     await db.upsertUser({
       openId: user.openId,
       lastSignedIn: signedInAt,

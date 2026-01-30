@@ -1,5 +1,7 @@
 import { eq, and, asc, desc, isNull, gte, lte, ne, sql, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import bcrypt from "bcryptjs";
+import { nanoid } from "nanoid";
 import {
   InsertUser,
   users,
@@ -94,6 +96,10 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.companyId = user.companyId;
       updateSet.companyId = user.companyId;
     }
+    if (user.password !== undefined) {
+      values.password = user.password;
+      updateSet.password = user.password;
+    }
 
     if (!values.lastSignedIn) {
       values.lastSignedIn = new Date();
@@ -141,6 +147,63 @@ export async function updateUserCompany(userId: number, companyId: number) {
   if (!db) throw new Error("Database not available");
 
   await db.update(users).set({ companyId }).where(eq(users.id, userId));
+}
+
+/** Criar garçom (login/senha) vinculado à empresa. Usado pelo PDV web. */
+export async function createWaiter(companyId: number, email: string, password: string, name: string): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await getUserByEmail(email);
+  if (existing) {
+    throw new Error("Já existe um usuário com este email");
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const openId = `local_${nanoid(32)}`;
+
+  await db.insert(users).values({
+    openId,
+    email: email.toLowerCase().trim(),
+    password: hashedPassword,
+    name: name || null,
+    loginMethod: "email",
+    role: "waiter",
+    companyId,
+    lastSignedIn: new Date(),
+  });
+
+  const created = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  return created[0]?.id ?? 0;
+}
+
+/** Listar garçons da empresa */
+export async function getWaitersByCompany(companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      companyId: users.companyId,
+      lastSignedIn: users.lastSignedIn,
+    })
+    .from(users)
+    .where(and(eq(users.companyId, companyId), eq(users.role, "waiter")));
+}
+
+/** Remover garçom (apenas desvincula da empresa; usuário continua no sistema) */
+export async function removeWaiter(waiterId: number, companyId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .update(users)
+    .set({ companyId: null })
+    .where(and(eq(users.id, waiterId), eq(users.companyId, companyId), eq(users.role, "waiter")));
 }
 
 // ==================== COMPANIES ====================
@@ -1092,10 +1155,20 @@ export async function acceptBuscaZapOrder(orderId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  const order = await getOrderById(orderId);
+  if (!order) throw new Error("Pedido não encontrado");
+
   await db
     .update(orders)
     .set({ status: "sent_to_kitchen" })
     .where(eq(orders.id, orderId));
+
+  try {
+    const { emitOrderStatusUpdate } = await import("./_core/websocket");
+    emitOrderStatusUpdate(order.companyId, orderId, "sent_to_kitchen");
+  } catch (error) {
+    console.log("[WebSocket] Failed to emit order-status-update:", error);
+  }
 
   return { success: true };
 }
@@ -1107,6 +1180,9 @@ export async function rejectBuscaZapOrder(orderId: number, reason?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  const order = await getOrderById(orderId);
+  if (!order) throw new Error("Pedido não encontrado");
+
   await db
     .update(orders)
     .set({ 
@@ -1114,6 +1190,13 @@ export async function rejectBuscaZapOrder(orderId: number, reason?: string) {
       notes: reason || "Pedido rejeitado pela empresa",
     })
     .where(eq(orders.id, orderId));
+
+  try {
+    const { emitOrderStatusUpdate } = await import("./_core/websocket");
+    emitOrderStatusUpdate(order.companyId, orderId, "cancelled");
+  } catch (error) {
+    console.log("[WebSocket] Failed to emit order-status-update:", error);
+  }
 
   return { success: true };
 }
@@ -1128,6 +1211,9 @@ export async function updateBuscaZapOrderStatus(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  const order = await getOrderById(orderId);
+  if (!order) throw new Error("Pedido não encontrado");
+
   const updateData: any = { status };
   
   if (status === "closed") {
@@ -1138,6 +1224,13 @@ export async function updateBuscaZapOrderStatus(
     .update(orders)
     .set(updateData)
     .where(eq(orders.id, orderId));
+
+  try {
+    const { emitOrderStatusUpdate } = await import("./_core/websocket");
+    emitOrderStatusUpdate(order.companyId, orderId, status);
+  } catch (error) {
+    console.log("[WebSocket] Failed to emit order-status-update:", error);
+  }
 
   return { success: true };
 }

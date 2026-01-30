@@ -1,4 +1,5 @@
 import { COOKIE_NAME } from "@shared/const";
+import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -34,6 +35,48 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
         return await db.getCompanyById(input.id);
+      }),
+  }),
+
+  // ==================== WAITERS (GARÇONS) ====================
+  waiters: router({
+    list: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin_global" && ctx.user.companyId !== input.companyId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado a esta empresa" });
+        }
+        return await db.getWaitersByCompany(input.companyId);
+      }),
+    create: protectedProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          email: z.string().email(),
+          password: z.string().min(6),
+          name: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin_global" && ctx.user.companyId !== input.companyId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado a esta empresa" });
+        }
+        const id = await db.createWaiter(
+          input.companyId,
+          input.email,
+          input.password,
+          input.name ?? input.email.split("@")[0]
+        );
+        return { id };
+      }),
+    remove: protectedProcedure
+      .input(z.object({ companyId: z.number(), waiterId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin_global" && ctx.user.companyId !== input.companyId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado a esta empresa" });
+        }
+        await db.removeWaiter(input.waiterId, input.companyId);
+        return { success: true };
       }),
   }),
 
@@ -179,6 +222,7 @@ export const appRouter = router({
       )
       .mutation(async ({ ctx, input }) => {
         const orderNumber = `#${Date.now().toString().slice(-6)}`;
+        const source = ctx.user.role === "waiter" ? "buscazap" : "pdv";
         const id = await db.createOrder({
           companyId: input.companyId,
           orderNumber,
@@ -194,9 +238,18 @@ export const appRouter = router({
           total: "0.00",
           notes: null,
           deliveryOrderId: null,
-          source: "pdv",
+          source,
           closedAt: null,
         });
+        try {
+          const fullOrder = await db.getOrderById(id);
+          if (fullOrder) {
+            const { emitNewOrder } = await import("./_core/websocket");
+            emitNewOrder(input.companyId, fullOrder);
+          }
+        } catch (e) {
+          console.warn("[WebSocket] Failed to emit new-order:", e);
+        }
         return { id, orderNumber };
       }),
     getById: protectedProcedure
@@ -260,6 +313,15 @@ export const appRouter = router({
           status: "pending",
           productionSector: input.productionSector || null,
         });
+        try {
+          const order = await db.getOrderById(input.orderId);
+          if (order) {
+            const { emitOrderUpdated } = await import("./_core/websocket");
+            emitOrderUpdated(order.companyId, input.orderId);
+          }
+        } catch (e) {
+          console.warn("[WebSocket] Failed to emit order-updated:", e);
+        }
         return { id };
       }),
     list: protectedProcedure

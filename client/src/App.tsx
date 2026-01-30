@@ -20,6 +20,7 @@ import OrderChat from "./pages/OrderChat";
 import Ratings from "./pages/Ratings";
 import DeliveryControl from "./pages/DeliveryControl";
 import ManageDrivers from "./pages/ManageDrivers";
+import ManageWaiters from "./pages/ManageWaiters";
 
 function Router() {
   return (
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/tables" component={Tables} />
       <Route path="/order/:id" component={Order} />
       <Route path="/waiter" component={Waiter} />
+      <Route path="/manage-waiters" component={ManageWaiters} />
       <Route path="/kitchen" component={Kitchen} />
       <Route path="/products" component={Products} />
       <Route path="/buscazap-orders" component={BuscaZapOrders} />
