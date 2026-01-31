@@ -1,4 +1,4 @@
-import { eq, and, asc, desc, isNull, gte, lte, ne, sql, inArray } from "drizzle-orm";
+import { eq, and, asc, desc, isNull, gte, lte, ne, sql, inArray, like } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import bcrypt from "bcryptjs";
 import { nanoid } from "nanoid";
@@ -208,11 +208,17 @@ export async function removeWaiter(waiterId: number, companyId: number): Promise
 
 // ==================== COMPANIES ====================
 
-export async function getAllCompanies() {
+/** Busca empresas por nome (para admin global). Não carrega todas de uma vez. */
+export async function searchCompaniesByName(query: string, limit = 50) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  return await db.select().from(companies).where(eq(companies.isActive, true));
+  const term = `%${query.trim()}%`;
+  return await db
+    .select()
+    .from(companies)
+    .where(and(eq(companies.isActive, true), like(companies.name, term)))
+    .limit(limit);
 }
 
 export async function getCompanyById(id: number) {

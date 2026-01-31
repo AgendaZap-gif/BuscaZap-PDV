@@ -28,9 +28,19 @@ export const appRouter = router({
 
   // ==================== COMPANIES ====================
   companies: router({
-    list: publicProcedure.query(async () => {
-      return await db.getAllCompanies();
-    }),
+    /** Lista empresas apenas por busca por nome (admin global). Não retorna todas para não pesar. */
+    list: protectedProcedure
+      .input(z.object({ search: z.string().min(1).optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin_global") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Apenas admin global pode listar empresas" });
+        }
+        const search = input?.search?.trim();
+        if (!search || search.length < 2) {
+          return [];
+        }
+        return await db.searchCompaniesByName(search, 50);
+      }),
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
