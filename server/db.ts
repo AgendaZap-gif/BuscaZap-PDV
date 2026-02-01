@@ -2561,6 +2561,7 @@ export async function upsertCrmFromDataBlock(
     .from(crmContacts)
     .where(
       and(eq(crmContacts.companyId, companyId), eq(crmContacts.phone, normalized))
+    )
     .limit(1);
 
   const tags = dataBlock.tags ?? [];
