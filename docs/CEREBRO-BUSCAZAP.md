@@ -39,12 +39,13 @@ Garanta que as migrations do Drizzle foram aplicadas (`drizzle-kit push` ou migr
 
 ## Integração com o app BuscaZap
 
-Se o app apontar para a API do PDV, use:
+O app (guia comercial, Pedijá ou qualquer listagem) deve ter um **botão de chat em cada empresa**. Ao tocar, abre a conversa com o agente (IA) daquela empresa.
 
-- `trpc.companyAi.isConfigured.useQuery()`
-- `trpc.companyAi.reply.useMutation()` com `companyId`, `messages` e opcionalmente `customerPhone`, `channel: 'app'`
+- **Doc detalhado:** [INTEGRACAO-APP-BUSCAZAP.md](./INTEGRACAO-APP-BUSCAZAP.md)
+- `trpc.companyAi.isConfigured.useQuery()` — esconder botão se não configurado
+- `trpc.companyAi.reply.useMutation()` com `companyId`, `messages`, `customerPhone`, `channel: 'app'`
 
-Assim o PDV mantém histórico, CRM e comportamento para cada empresa.
+Assim o PDV mantém histórico, CRM e comportamento **por empresa e por categoria** (delivery, roupas, agro, serviços, etc.). As notificações e recomendações são personalizadas por empresa e tipo de negócio.
 
 ## Arquivos
 

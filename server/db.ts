@@ -30,6 +30,7 @@ import {
   companyAiSettings,
   crmContacts,
   userBehavior,
+  notificationQueue,
   type Company,
   type Table,
   type Category,
@@ -199,6 +200,30 @@ export async function getWaitersByCompany(companyId: number) {
     })
     .from(users)
     .where(and(eq(users.companyId, companyId), eq(users.role, "waiter")));
+}
+
+/** Criar usuário admin da empresa (painel BuscaZap IA - login por empresa). */
+export async function createCompanyAdminUser(
+  companyId: number,
+  email: string,
+  passwordHash: string,
+  name: string
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const openId = `company_${nanoid(24)}`;
+  await db.insert(users).values({
+    openId,
+    email: email.toLowerCase().trim(),
+    password: passwordHash,
+    name: name || null,
+    loginMethod: "email",
+    role: "admin",
+    companyId,
+    lastSignedIn: new Date(),
+  });
+  const created = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  return created[0]?.id ?? 0;
 }
 
 /** Remover garçom (apenas desvincula da empresa; usuário continua no sistema) */
@@ -2259,6 +2284,75 @@ export async function toggleExternalPlatformIntegration(
 
 // ==================== CÉREBRO BUSCAZAP (IA / Conversas / CRM) ====================
 
+/**
+ * Configurações de IA da empresa (company_ai_settings).
+ * Usado para saber se o chat com IA está habilitado para essa empresa (plano destaque+ ou serviço IA separado).
+ */
+export async function getCompanyAiSettings(companyId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(companyAiSettings)
+    .where(eq(companyAiSettings.companyId, companyId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Cria ou atualiza company_ai_settings para a empresa.
+ * Usado pelo painel da empresa (app/PDV) ao ativar e salvar "Configurar assistente / Treinamento inicial do bot".
+ */
+export async function upsertCompanyAiSettings(
+  companyId: number,
+  data: {
+    aiEnabled: boolean;
+    autoResponseEnabled?: boolean;
+    escalateToHumanEnabled?: boolean;
+    personality?: "professional" | "friendly" | "casual" | "formal";
+    language?: string;
+    customGreeting?: string | null;
+    customInstructions?: string | null;
+    businessHours?: {
+      enabled: boolean;
+      schedule?: { [day: string]: { open: string; close: string } | null };
+      outsideHoursMessage?: string;
+    } | null;
+    maxMessagesPerDay?: number;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await getCompanyAiSettings(companyId);
+  const payload = {
+    aiEnabled: data.aiEnabled,
+    autoResponseEnabled: data.autoResponseEnabled ?? true,
+    escalateToHumanEnabled: data.escalateToHumanEnabled ?? true,
+    personality: (data.personality ?? "friendly") as "professional" | "friendly" | "casual" | "formal",
+    language: data.language ?? "pt-BR",
+    customGreeting: data.customGreeting ?? null,
+    customInstructions: data.customInstructions ?? null,
+    businessHours: data.businessHours ?? null,
+    maxMessagesPerDay: data.maxMessagesPerDay ?? 1000,
+    updatedAt: new Date(),
+  };
+
+  if (existing) {
+    await db
+      .update(companyAiSettings)
+      .set(payload)
+      .where(eq(companyAiSettings.companyId, companyId));
+    return existing.id;
+  }
+
+  const [row] = await db.insert(companyAiSettings).values({
+    companyId,
+    ...payload,
+  });
+  return row.insertId;
+}
+
 export type ConversationChannel = "whatsapp" | "app" | "web" | "telegram";
 export type MessageRole = "customer" | "assistant" | "human" | "system";
 
@@ -2532,4 +2626,152 @@ export async function trackUserBehavior(
     dayOfWeek,
     hourOfDay,
   });
+}
+
+// ==================== NOTIFICATION QUEUE ====================
+
+export type NotificationQueueType = "recommendation" | "promotion" | "reminder" | "follow_up" | "upsell";
+export type NotificationQueueChannel = "whatsapp" | "push" | "sms";
+
+export async function enqueueNotification(data: {
+  companyId: number;
+  customerPhone: string;
+  type: NotificationQueueType;
+  message: string;
+  channel?: NotificationQueueChannel;
+  scheduledFor?: Date;
+  metadata?: { triggeredBy?: string; productId?: number; orderId?: number };
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [row] = await db.insert(notificationQueue).values({
+    companyId: data.companyId,
+    customerPhone: data.customerPhone.replace(/\D/g, "").slice(-11) || data.customerPhone,
+    type: data.type,
+    channel: data.channel ?? "whatsapp",
+    message: data.message,
+    scheduledFor: data.scheduledFor ?? new Date(),
+    status: "pending",
+    metadata: data.metadata ?? undefined,
+  });
+  return row.insertId;
+}
+
+/** Listar contatos do CRM por empresa (painel BuscaZap IA). */
+export async function getCrmContactsByCompany(companyId: number, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db
+    .select()
+    .from(crmContacts)
+    .where(eq(crmContacts.companyId, companyId))
+    .orderBy(desc(crmContacts.lastContactAt))
+    .limit(limit);
+}
+
+/** Métricas para dashboard (conversas, leads, conversão) por empresa e período. */
+export async function getCompanyMetricsForDashboard(
+  companyId: number,
+  period: "today" | "week" | "month"
+): Promise<{
+  conversationsStarted: number;
+  messagesReceived: number;
+  messagesSent: number;
+  newLeads: number;
+  hotLeads: number;
+  ordersCreated: number;
+  conversionRate: number;
+  byDate: Array<{ date: string; conversations: number; orders: number }>;
+}> {
+  const db = await getDb();
+  if (!db) {
+    return {
+      conversationsStarted: 0,
+      messagesReceived: 0,
+      messagesSent: 0,
+      newLeads: 0,
+      hotLeads: 0,
+      ordersCreated: 0,
+      conversionRate: 0,
+      byDate: [],
+    };
+  }
+  const now = new Date();
+  let start = new Date();
+  if (period === "today") start.setHours(0, 0, 0, 0);
+  else if (period === "week") start.setDate(now.getDate() - 7);
+  else start.setDate(now.getDate() - 30);
+
+  const convs = await db.select().from(conversations).where(and(eq(conversations.companyId, companyId), gte(conversations.createdAt, start)));
+  const msgs = await db.select().from(messages).where(and(eq(messages.companyId, companyId), gte(messages.createdAt, start)));
+  const contacts = await db.select().from(crmContacts).where(and(eq(crmContacts.companyId, companyId), gte(crmContacts.firstContactAt, start)));
+  const hotLeads = contacts.filter((c) => (c.leadScore ?? 0) >= 70).length;
+  const ordersList = await db.select().from(orders).where(and(eq(orders.companyId, companyId), eq(orders.source, "buscazap"), gte(orders.createdAt, start)));
+  const ordersCreated = ordersList.filter((o) => o.status !== "cancelled").length;
+  const conversionRate = convs.length > 0 ? Math.round((ordersCreated / convs.length) * 10000) / 100 : 0;
+
+  const received = msgs.filter((m) => m.role === "customer").length;
+  const sent = msgs.filter((m) => m.role === "assistant" || m.role === "human").length;
+
+  const byDate: Array<{ date: string; conversations: number; orders: number }> = [];
+  const dayMap: Record<string, { conversations: number; orders: number }> = {};
+  for (const c of convs) {
+    const d = new Date(c.createdAt).toISOString().slice(0, 10);
+    if (!dayMap[d]) dayMap[d] = { conversations: 0, orders: 0 };
+    dayMap[d].conversations++;
+  }
+  for (const o of ordersList) {
+    if (o.status === "cancelled") continue;
+    const d = new Date(o.createdAt).toISOString().slice(0, 10);
+    if (!dayMap[d]) dayMap[d] = { conversations: 0, orders: 0 };
+    dayMap[d].orders++;
+  }
+  for (const [date, v] of Object.entries(dayMap)) byDate.push({ date, ...v });
+  byDate.sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    conversationsStarted: convs.length,
+    messagesReceived: received,
+    messagesSent: sent,
+    newLeads: contacts.length,
+    hotLeads,
+    ordersCreated,
+    conversionRate,
+    byDate,
+  };
+}
+
+/** Telefones de clientes ativos (últimos 90 dias) para promoções em massa. */
+export async function getActiveCustomerPhones(companyId: number): Promise<string[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const since = new Date();
+  since.setDate(since.getDate() - 90);
+  const rows = await db
+    .select({ customerPhone: conversations.customerPhone })
+    .from(conversations)
+    .where(and(eq(conversations.companyId, companyId), gte(conversations.lastMessageAt, since)));
+  const set = new Set(rows.map((r) => r.customerPhone));
+  return Array.from(set);
+}
+
+/** Inserir conhecimento na base (PDF/texto) para treinar IA. */
+export async function addCompanyKnowledge(
+  companyId: number,
+  type: "pdf" | "website" | "product" | "faq" | "instagram" | "manual",
+  title: string,
+  content: string,
+  sourceUrl?: string
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const [row] = await db.insert(companyKnowledgeBase).values({
+    companyId,
+    type,
+    title,
+    content: content.slice(0, 65535),
+    sourceUrl: sourceUrl ?? null,
+    isActive: true,
+  });
+  return row.insertId;
 }

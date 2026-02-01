@@ -2,7 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, companyProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
 import { buildCompanyPrompt, companyToBrainData, parseDataBlock, type DataBlock } from "./_core/buscazapBrain";
@@ -13,14 +13,86 @@ export const appRouter = router({
 
   // ==================== CÉREBRO BUSCAZAP (IA por empresa) ====================
   companyAi: router({
-    /** Verifica se a IA (Gemini) está configurada. */
+    /** Verifica se a IA (Gemini) está configurada globalmente. Uso interno / painel. */
     isConfigured: publicProcedure.query(() => ({
       configured: isGeminiConfigured(),
     })),
 
     /**
+     * Verifica se o chat com IA está habilitado para esta empresa.
+     * Habilitado quando: company_ai_settings.aiEnabled = true (configurado no painel da empresa ou por plano destaque+).
+     * Permite vender "serviço IA" separado sem plano destaque.
+     */
+    chatEnabledForCompany: publicProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input }) => {
+        const company = await db.getCompanyById(input.companyId);
+        if (!company) return { enabled: false };
+        const settings = await db.getCompanyAiSettings(input.companyId);
+        const enabled = settings?.aiEnabled === true;
+        return { enabled };
+      }),
+
+    /**
+     * Retorna as configurações de IA da empresa (painel: Configurar assistente / Treinamento).
+     */
+    getSettings: publicProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input }) => {
+        const company = await db.getCompanyById(input.companyId);
+        if (!company) return null;
+        return db.getCompanyAiSettings(input.companyId);
+      }),
+
+    /**
+     * Cria/atualiza company_ai_settings. Chamado pelo painel ao ativar e salvar o assistente.
+     * Define aiEnabled e demais campos de configuração/treinamento.
+     */
+    upsertSettings: publicProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          aiEnabled: z.boolean(),
+          autoResponseEnabled: z.boolean().optional(),
+          escalateToHumanEnabled: z.boolean().optional(),
+          personality: z.enum(["professional", "friendly", "casual", "formal"]).optional(),
+          language: z.string().optional(),
+          customGreeting: z.string().nullable().optional(),
+          customInstructions: z.string().nullable().optional(),
+          businessHours: z
+            .object({
+              enabled: z.boolean(),
+              schedule: z.record(z.string(), z.object({ open: z.string(), close: z.string() }).nullable()).optional(),
+              outsideHoursMessage: z.string().optional(),
+            })
+            .nullable()
+            .optional(),
+          maxMessagesPerDay: z.number().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const company = await db.getCompanyById(input.companyId);
+        if (!company) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Empresa não encontrada." });
+        }
+        await db.upsertCompanyAiSettings(input.companyId, {
+          aiEnabled: input.aiEnabled,
+          autoResponseEnabled: input.autoResponseEnabled,
+          escalateToHumanEnabled: input.escalateToHumanEnabled,
+          personality: input.personality,
+          language: input.language,
+          customGreeting: input.customGreeting,
+          customInstructions: input.customInstructions,
+          businessHours: input.businessHours ?? undefined,
+          maxMessagesPerDay: input.maxMessagesPerDay,
+        });
+        return { success: true };
+      }),
+
+    /**
      * Envia mensagens e recebe resposta da IA da empresa.
      * Salva conversa, atualiza CRM e comportamento.
+     * Exige: Gemini configurado, empresa existe, chat habilitado para a empresa (company_ai_settings.aiEnabled).
      */
     reply: publicProcedure
       .input(
@@ -40,6 +112,14 @@ export const appRouter = router({
         const company = await db.getCompanyById(input.companyId);
         if (!company) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Empresa não encontrada." });
+        }
+
+        const settings = await db.getCompanyAiSettings(input.companyId);
+        if (settings?.aiEnabled !== true) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Chat com IA não está habilitado para esta empresa. Configure no painel da empresa ou contrate o plano.",
+          });
         }
 
         const customerPhone = input.customerPhone ?? "anonymous";
@@ -131,7 +211,8 @@ export const appRouter = router({
             tags: dataBlock.tags,
             crm_update: dataBlock.crm_update,
           });
-          await db.trackUserBehavior(input.companyId, customerPhone, "message");
+          const companyCategory = (company.settings as Record<string, string> | undefined)?.category ?? undefined;
+          await db.trackUserBehavior(input.companyId, customerPhone, "message", companyCategory);
         }
 
         return {
@@ -139,6 +220,69 @@ export const appRouter = router({
           dataBlock: dataBlock ?? undefined,
           model: result.model,
         };
+      }),
+  }),
+
+  // ==================== AUTH EMPRESA (painel BuscaZap IA - JWT) ====================
+  companyAuth: router({
+    register: publicProcedure
+      .input(z.object({ name: z.string().min(1), email: z.string().email(), password: z.string().min(6), referralCode: z.string().optional() }))
+      .mutation(async ({ input }) => {
+        const { registerCompany } = await import("./_core/companyAuth.js");
+        return await registerCompany(input.name, input.email, input.password, input.referralCode);
+      }),
+    login: publicProcedure
+      .input(z.object({ email: z.string().email(), password: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        const { loginCompany } = await import("./_core/companyAuth.js");
+        return await loginCompany(input.email, input.password);
+      }),
+  }),
+
+  // ==================== PAINEL ADMIN BUSCAZAP IA ====================
+  admin: router({
+    getMetrics: companyProcedure
+      .input(z.object({ companyId: z.number(), period: z.enum(["today", "week", "month"]) }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado." });
+        return await db.getCompanyMetricsForDashboard(input.companyId, input.period);
+      }),
+    getCrm: companyProcedure
+      .input(z.object({ companyId: z.number(), limit: z.number().optional() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado." });
+        return await db.getCrmContactsByCompany(input.companyId, input.limit ?? 100);
+      }),
+    trainPdf: companyProcedure
+      .input(z.object({ companyId: z.number(), title: z.string(), content: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado." });
+        const id = await db.addCompanyKnowledge(input.companyId, "pdf", input.title, input.content);
+        const { storeEmbedding, isEmbeddingsConfigured } = await import("./_core/embeddings.js");
+        if (isEmbeddingsConfigured()) {
+          try {
+            await storeEmbedding(input.companyId, input.content.slice(0, 8000));
+          } catch (e) {
+            console.warn("[Admin] Embedding store failed:", e);
+          }
+        }
+        return { id };
+      }),
+    promotionsSend: companyProcedure
+      .input(z.object({ companyId: z.number(), message: z.string().min(1) }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado." });
+        const phones = await db.getActiveCustomerPhones(input.companyId);
+        for (const phone of phones) {
+          await db.enqueueNotification({
+            companyId: input.companyId,
+            customerPhone: phone,
+            type: "promotion",
+            message: input.message,
+            scheduledFor: new Date(),
+          });
+        }
+        return { sent: phones.length };
       }),
   }),
 

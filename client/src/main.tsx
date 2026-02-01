@@ -43,9 +43,13 @@ const trpcClient = trpc.createClient({
       url: "/api/trpc",
       transformer: superjson,
       fetch(input, init) {
+        const headers = new Headers(init?.headers);
+        const companyToken = typeof window !== "undefined" ? localStorage.getItem("buscazap_company_token") : null;
+        if (companyToken) headers.set("Authorization", `Bearer ${companyToken}`);
         return globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",
+          headers,
         });
       },
     }),

@@ -39,7 +39,18 @@ export const companies = mysqlTable("companies", {
     taxServicePercent?: number;
     enableTableService?: boolean;
     enableDelivery?: boolean;
+    category?: string;
+    description?: string;
+    hours?: string;
+    services?: string;
+    promotions?: string;
+    [key: string]: unknown;
   }>(),
+  // Auth e growth (BuscaZap IA / SaaS)
+  passwordHash: text("passwordHash"),
+  referralCode: varchar("referralCode", { length: 20 }).unique(),
+  domain: varchar("domain", { length: 255 }),
+  engagementScore: int("engagementScore").default(100).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -468,6 +479,36 @@ export type CompanyKnowledgeBase = typeof companyKnowledgeBase.$inferSelect;
 export type InsertCompanyKnowledgeBase = typeof companyKnowledgeBase.$inferInsert;
 
 /**
+ * Embeddings - Memória vetorial por empresa (IA avançada)
+ * vector: JSON array de floats (ex.: OpenAI text-embedding-3-small = 1536 dims)
+ */
+export const embeddings = mysqlTable("embeddings", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  content: text("content").notNull(),
+  vector: json("vector").$type<number[]>().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Embedding = typeof embeddings.$inferSelect;
+export type InsertEmbedding = typeof embeddings.$inferInsert;
+
+/**
+ * User Memory - Memória por usuário/empresa (preferências, fatos)
+ */
+export const userMemory = mysqlTable("user_memory", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  customerPhone: varchar("customerPhone", { length: 20 }).notNull(),
+  key: varchar("key", { length: 100 }).notNull(),
+  value: text("value").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type UserMemory = typeof userMemory.$inferSelect;
+export type InsertUserMemory = typeof userMemory.$inferInsert;
+
+/**
  * Company AI Settings - Configurações de IA por empresa
  */
 export const companyAiSettings = mysqlTable("company_ai_settings", {
@@ -658,6 +699,38 @@ export const companyMetrics = mysqlTable("company_metrics", {
 
 export type CompanyMetric = typeof companyMetrics.$inferSelect;
 export type InsertCompanyMetric = typeof companyMetrics.$inferInsert;
+
+/**
+ * WhatsApp Numbers - Multi número por empresa (Graph API / Cloud API)
+ * Usado para rotear webhook por display_phone_number
+ */
+export const whatsappNumbers = mysqlTable("whatsapp_numbers", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  token: text("token"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type WhatsappNumber = typeof whatsappNumbers.$inferSelect;
+export type InsertWhatsappNumber = typeof whatsappNumbers.$inferInsert;
+
+/**
+ * Marketplace Ads - Destaque pago no BuscaZap
+ */
+export const marketplaceAds = mysqlTable("marketplace_ads", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MarketplaceAd = typeof marketplaceAds.$inferSelect;
+export type InsertMarketplaceAd = typeof marketplaceAds.$inferInsert;
 
 /**
  * WhatsApp Sessions - Sessões do WhatsApp Web para whatsapp-web.js

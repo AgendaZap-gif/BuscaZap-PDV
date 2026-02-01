@@ -27,6 +27,16 @@ const requireUser = t.middleware(async opts => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
+const requireCompany = t.middleware(async opts => {
+  const { ctx, next } = opts;
+  if (!ctx.companyId) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Token de empresa inválido ou ausente." });
+  }
+  return next({ ctx: { ...ctx, companyId: ctx.companyId } });
+});
+
+export const companyProcedure = t.procedure.use(requireCompany);
+
 export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
