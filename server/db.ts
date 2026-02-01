@@ -24,6 +24,12 @@ import {
   companyDeliverySettings,
   companyDrivers,
   externalPlatformIntegrations,
+  conversations,
+  messages,
+  companyKnowledgeBase,
+  companyAiSettings,
+  crmContacts,
+  userBehavior,
   type Company,
   type Table,
   type Category,
@@ -2249,4 +2255,281 @@ export async function toggleExternalPlatformIntegration(
     );
 
   return { success: true };
+}
+
+// ==================== CÉREBRO BUSCAZAP (IA / Conversas / CRM) ====================
+
+export type ConversationChannel = "whatsapp" | "app" | "web" | "telegram";
+export type MessageRole = "customer" | "assistant" | "human" | "system";
+
+/**
+ * Obter ou criar conversa por empresa + telefone do cliente
+ */
+export async function getOrCreateConversation(
+  companyId: number,
+  customerPhone: string,
+  channel: ConversationChannel = "app",
+  customerName?: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const normalized = customerPhone.replace(/\D/g, "").slice(-11) || customerPhone;
+  const existing = await db
+    .select()
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.companyId, companyId),
+        eq(conversations.customerPhone, normalized),
+        eq(conversations.channel, channel)
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0];
+  }
+
+  await db.insert(conversations).values({
+    companyId,
+    customerPhone: normalized,
+    customerName: customerName ?? null,
+    channel,
+    status: "active",
+    aiEnabled: true,
+    lastMessageAt: new Date(),
+  });
+
+  const created = await db
+    .select()
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.companyId, companyId),
+        eq(conversations.customerPhone, normalized),
+        eq(conversations.channel, channel)
+      )
+    )
+    .limit(1);
+
+  return created[0]!;
+}
+
+/**
+ * Adicionar mensagem à conversa (para histórico da IA)
+ */
+export async function addMessageToConversation(
+  conversationId: number,
+  companyId: number,
+  role: MessageRole,
+  content: string,
+  channel: ConversationChannel = "app",
+  aiMetadata?: {
+    intent?: string;
+    leadScore?: number;
+    tags?: string[];
+    products?: string[];
+    nextAction?: string;
+    crmUpdate?: { name?: string; interest?: string; budget?: string; city?: string };
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(messages).values({
+    conversationId,
+    companyId,
+    role,
+    content,
+    channel,
+    aiMetadata: aiMetadata ?? undefined,
+  });
+
+  await db
+    .update(conversations)
+    .set({ lastMessageAt: new Date() })
+    .where(eq(conversations.id, conversationId));
+}
+
+/**
+ * Listar mensagens da conversa (para contexto da IA)
+ */
+export async function getConversationMessages(conversationId: number, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select({ id: messages.id, role: messages.role, content: messages.content, createdAt: messages.createdAt })
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(desc(messages.createdAt))
+    .limit(limit);
+}
+
+/**
+ * Base de conhecimento da empresa para o prompt da IA (cardápio, FAQs, etc.)
+ */
+export async function getCompanyKnowledgeForBrain(companyId: number): Promise<string> {
+  const db = await getDb();
+  if (!db) return "";
+
+  const rows = await db
+    .select({ content: companyKnowledgeBase.content, title: companyKnowledgeBase.title })
+    .from(companyKnowledgeBase)
+    .where(
+      and(eq(companyKnowledgeBase.companyId, companyId), eq(companyKnowledgeBase.isActive, true))
+    );
+
+  if (rows.length === 0) return "";
+  return rows.map((r) => `[${r.title}]\n${r.content}`).join("\n\n");
+}
+
+/**
+ * Resumo de comportamento do usuário para o prompt (horários, categorias, pedidos)
+ */
+export async function getUserBehaviorSummaryForBrain(companyId: number, customerPhone: string): Promise<string> {
+  const db = await getDb();
+  if (!db) return "";
+
+  const normalized = customerPhone.replace(/\D/g, "").slice(-11) || customerPhone;
+
+  const rows = await db
+    .select({
+      action: userBehavior.action,
+      category: userBehavior.category,
+      dayOfWeek: userBehavior.dayOfWeek,
+      hourOfDay: userBehavior.hourOfDay,
+      value: userBehavior.value,
+      createdAt: userBehavior.createdAt,
+    })
+    .from(userBehavior)
+    .where(
+      and(
+        eq(userBehavior.companyId, companyId),
+        eq(userBehavior.customerPhone, normalized)
+      )
+    )
+    .orderBy(desc(userBehavior.createdAt))
+    .limit(100);
+
+  if (rows.length === 0) return "";
+
+  const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const parts: string[] = [];
+  const byDay: Record<number, number> = {};
+  const byHour: Record<number, number> = {};
+  const categories: string[] = [];
+
+  for (const r of rows) {
+    byDay[r.dayOfWeek] = (byDay[r.dayOfWeek] ?? 0) + 1;
+    byHour[r.hourOfDay] = (byHour[r.hourOfDay] ?? 0) + 1;
+    if (r.category && !categories.includes(r.category)) categories.push(r.category);
+  }
+
+  const topDays = Object.entries(byDay)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([d]) => dayNames[Number(d)]);
+  const topHours = Object.entries(byHour)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([h]) => `${h}h`);
+
+  if (topDays.length) parts.push(`Dias mais ativos: ${topDays.join(", ")}`);
+  if (topHours.length) parts.push(`Horários preferidos: ${topHours.join(", ")}`);
+  if (categories.length) parts.push(`Categorias de interesse: ${categories.slice(0, 5).join(", ")}`);
+  parts.push(`Total de interações: ${rows.length}`);
+
+  return parts.join(". ");
+}
+
+/**
+ * Atualizar ou criar contato no CRM a partir do bloco <DATA> da IA
+ */
+export async function upsertCrmFromDataBlock(
+  companyId: number,
+  customerPhone: string,
+  dataBlock: {
+    lead_score?: number;
+    tags?: string[];
+    crm_update?: { name?: string; interest?: string; budget?: string; city?: string };
+  }
+) {
+  const db = await getDb();
+  if (!db) return;
+
+  const normalized = customerPhone.replace(/\D/g, "").slice(-11) || customerPhone;
+  const now = new Date();
+
+  const existing = await db
+    .select()
+    .from(crmContacts)
+    .where(
+      and(eq(crmContacts.companyId, companyId), eq(crmContacts.phone, normalized))
+    .limit(1);
+
+  const tags = dataBlock.tags ?? [];
+  const score = Math.min(100, Math.max(0, dataBlock.lead_score ?? 0));
+  const crm = dataBlock.crm_update ?? {};
+
+  if (existing.length > 0) {
+    const prev = existing[0];
+    const prevTags = (prev.tags as string[] | null) ?? [];
+    const mergedTags = [...new Set([...prevTags, ...tags])];
+    await db
+      .update(crmContacts)
+      .set({
+        leadScore: score > (prev.leadScore ?? 0) ? score : prev.leadScore,
+        tags: JSON.stringify(mergedTags),
+        name: (crm.name && crm.name.trim()) ? crm.name.trim() : prev.name,
+        lastContactAt: now,
+        conversationsCount: (prev.conversationsCount ?? 0) + 1,
+        updatedAt: now,
+      })
+      .where(eq(crmContacts.id, prev.id));
+    return;
+  }
+
+  await db.insert(crmContacts).values({
+    companyId,
+    phone: normalized,
+    name: crm.name ?? null,
+    leadScore: score,
+    tags: JSON.stringify(tags),
+    firstContactAt: now,
+    lastContactAt: now,
+    conversationsCount: 1,
+  });
+}
+
+/**
+ * Registrar comportamento do usuário (para recomendações futuras)
+ */
+export async function trackUserBehavior(
+  companyId: number,
+  customerPhone: string,
+  action: "message" | "order" | "quote" | "click" | "view" | "search" | "rating",
+  category?: string,
+  productId?: number,
+  value?: number
+) {
+  const db = await getDb();
+  if (!db) return;
+
+  const normalized = customerPhone.replace(/\D/g, "").slice(-11) || customerPhone;
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const hourOfDay = now.getHours();
+
+  await db.insert(userBehavior).values({
+    companyId,
+    customerPhone: normalized,
+    action,
+    category: category ?? null,
+    productId: productId ?? null,
+    value: value != null ? String(value) : null,
+    dayOfWeek,
+    hourOfDay,
+  });
 }

@@ -8,4 +8,8 @@ export const ENV = {
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
   port: process.env.PORT ?? "8080",
+  // Gemini (cérebro BuscaZap — mesmo que no app principal)
+  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
+  geminiModel: process.env.GEMINI_MODEL ?? "models/gemini-2.5-flash",
+  geminiFallbackModel: process.env.GEMINI_FALLBACK_MODEL ?? "models/gemini-2.5-pro",
 };

@@ -1,24 +1,9 @@
 /**
- * LLM (Large Language Model) - DISABLED
- * 
- * This module was previously using Manus Forge API.
- * To re-enable, integrate with OpenAI API directly.
- * 
- * Original backup: llm.ts.backup
- * 
- * Example integration:
- * 
- * import OpenAI from 'openai';
- * 
- * const openai = new OpenAI({
- *   apiKey: process.env.OPENAI_API_KEY,
- * });
- * 
- * const completion = await openai.chat.completions.create({
- *   model: "gpt-4",
- *   messages: [{ role: "user", content: "Hello!" }],
- * });
+ * LLM (Large Language Model) — Gemini
+ * Usa GEMINI_API_KEY quando configurado (cérebro BuscaZap).
  */
+
+import { geminiChat, toGeminiMessages, isGeminiConfigured } from "./gemini.js";
 
 export interface LLMMessage {
   role: "system" | "user" | "assistant";
@@ -36,12 +21,27 @@ export async function chatCompletion(
   messages: LLMMessage[],
   options: LLMOptions = {}
 ): Promise<string> {
-  throw new Error("LLM is disabled. Please integrate with OpenAI API or similar service.");
+  if (!isGeminiConfigured()) {
+    throw new Error("GEMINI_API_KEY não configurado. Configure no .env para usar IA.");
+  }
+  const systemMsg = messages.find((m) => m.role === "system");
+  const conversation = messages.filter((m) => m.role !== "system");
+  const geminiMessages = toGeminiMessages(conversation);
+  const result = await geminiChat({
+    systemInstruction: systemMsg?.content,
+    messages: geminiMessages,
+    temperature: options.temperature,
+    maxOutputTokens: options.max_tokens,
+  });
+  return result.text;
 }
 
 export async function streamChatCompletion(
   messages: LLMMessage[],
-  options: LLMOptions = {}
+  _options: LLMOptions = {}
 ): Promise<AsyncIterable<string>> {
-  throw new Error("LLM streaming is disabled. Please integrate with OpenAI API or similar service.");
+  const text = await chatCompletion(messages, _options);
+  return (async function* () {
+    yield text;
+  })();
 }

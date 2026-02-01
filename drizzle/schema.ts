@@ -383,3 +383,334 @@ export const externalPlatformIntegrations = mysqlTable("external_platform_integr
 
 export type ExternalPlatformIntegration = typeof externalPlatformIntegrations.$inferSelect;
 export type InsertExternalPlatformIntegration = typeof externalPlatformIntegrations.$inferInsert;
+
+// ============================================
+// AI SaaS Platform Tables
+// ============================================
+
+/**
+ * Conversations - Conversas unificadas entre todos os canais (WhatsApp, App, Web)
+ */
+export const conversations = mysqlTable("conversations", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  customerPhone: varchar("customerPhone", { length: 20 }).notNull(),
+  customerName: varchar("customerName", { length: 255 }),
+  channel: mysqlEnum("channel", ["whatsapp", "app", "web", "telegram"]).default("whatsapp").notNull(),
+  status: mysqlEnum("status", ["active", "waiting_human", "closed", "archived"]).default("active").notNull(),
+  assignedToUserId: int("assignedToUserId"), // Atendente humano responsável
+  aiEnabled: boolean("aiEnabled").default(true).notNull(), // IA ativa nesta conversa
+  lastMessageAt: timestamp("lastMessageAt").defaultNow().notNull(),
+  metadata: json("metadata").$type<{
+    lastIntent?: string;
+    leadScore?: number;
+    tags?: string[];
+    summary?: string;
+  }>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Conversation = typeof conversations.$inferSelect;
+export type InsertConversation = typeof conversations.$inferInsert;
+
+/**
+ * Messages - Mensagens unificadas de todas as conversas
+ */
+export const messages = mysqlTable("messages", {
+  id: int("id").autoincrement().primaryKey(),
+  conversationId: int("conversationId").notNull(),
+  companyId: int("companyId").notNull(),
+  role: mysqlEnum("role", ["customer", "assistant", "human", "system"]).notNull(),
+  content: text("content").notNull(),
+  channel: mysqlEnum("channel", ["whatsapp", "app", "web", "telegram"]).default("whatsapp").notNull(),
+  // Metadados da IA
+  aiMetadata: json("aiMetadata").$type<{
+    intent?: string;
+    leadScore?: number;
+    tags?: string[];
+    products?: string[];
+    nextAction?: string;
+    crmUpdate?: {
+      name?: string;
+      interest?: string;
+      budget?: string;
+      city?: string;
+    };
+    confidence?: number;
+    escalateToHuman?: boolean;
+  }>(),
+  // Referências externas
+  whatsappMessageId: varchar("whatsappMessageId", { length: 255 }),
+  isRead: boolean("isRead").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = typeof messages.$inferInsert;
+
+/**
+ * Company Knowledge Base - Base de conhecimento treinada por empresa
+ */
+export const companyKnowledgeBase = mysqlTable("company_knowledge_base", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  type: mysqlEnum("type", ["pdf", "website", "product", "faq", "instagram", "manual"]).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(), // Conteúdo extraído/processado
+  sourceUrl: varchar("sourceUrl", { length: 500 }), // URL original se aplicável
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CompanyKnowledgeBase = typeof companyKnowledgeBase.$inferSelect;
+export type InsertCompanyKnowledgeBase = typeof companyKnowledgeBase.$inferInsert;
+
+/**
+ * Company AI Settings - Configurações de IA por empresa
+ */
+export const companyAiSettings = mysqlTable("company_ai_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull().unique(),
+  aiEnabled: boolean("aiEnabled").default(true).notNull(),
+  autoResponseEnabled: boolean("autoResponseEnabled").default(true).notNull(),
+  escalateToHumanEnabled: boolean("escalateToHumanEnabled").default(true).notNull(),
+  // Personalidade e comportamento
+  personality: mysqlEnum("personality", ["professional", "friendly", "casual", "formal"]).default("friendly").notNull(),
+  language: varchar("language", { length: 10 }).default("pt-BR").notNull(),
+  // Prompts customizados
+  customGreeting: text("customGreeting"),
+  customInstructions: text("customInstructions"),
+  // Horários de funcionamento para IA
+  businessHours: json("businessHours").$type<{
+    enabled: boolean;
+    schedule: {
+      [day: string]: { open: string; close: string } | null;
+    };
+    outsideHoursMessage?: string;
+  }>(),
+  // Limites
+  maxMessagesPerDay: int("maxMessagesPerDay").default(1000).notNull(),
+  messagesUsedToday: int("messagesUsedToday").default(0).notNull(),
+  lastResetAt: timestamp("lastResetAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CompanyAiSettings = typeof companyAiSettings.$inferSelect;
+export type InsertCompanyAiSettings = typeof companyAiSettings.$inferInsert;
+
+/**
+ * CRM Contacts - Contatos do CRM por empresa
+ */
+export const crmContacts = mysqlTable("crm_contacts", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  name: varchar("name", { length: 255 }),
+  email: varchar("email", { length: 320 }),
+  // Dados do CRM
+  leadScore: int("leadScore").default(0).notNull(), // 0-100
+  tags: json("tags").$type<string[]>().default([]),
+  // Dados comportamentais
+  totalOrders: int("totalOrders").default(0).notNull(),
+  totalSpent: decimal("totalSpent", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  averageTicket: decimal("averageTicket", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  lastOrderAt: timestamp("lastOrderAt"),
+  // Preferências detectadas
+  preferences: json("preferences").$type<{
+    favoriteCategories?: string[];
+    favoriteProducts?: string[];
+    preferredDays?: string[];
+    preferredHours?: number[];
+    allergies?: string[];
+    notes?: string;
+  }>(),
+  // Metadados
+  firstContactAt: timestamp("firstContactAt").defaultNow().notNull(),
+  lastContactAt: timestamp("lastContactAt").defaultNow().notNull(),
+  conversationsCount: int("conversationsCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CrmContact = typeof crmContacts.$inferSelect;
+export type InsertCrmContact = typeof crmContacts.$inferInsert;
+
+/**
+ * CRM Tags - Tags disponíveis por empresa
+ */
+export const crmTags = mysqlTable("crm_tags", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  name: varchar("name", { length: 50 }).notNull(),
+  color: varchar("color", { length: 7 }).default("#3B82F6").notNull(), // Hex color
+  description: text("description"),
+  isAutomatic: boolean("isAutomatic").default(false).notNull(), // Tag gerada automaticamente pela IA
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CrmTag = typeof crmTags.$inferSelect;
+export type InsertCrmTag = typeof crmTags.$inferInsert;
+
+/**
+ * User Behavior - Rastreamento comportamental dos usuários
+ */
+export const userBehavior = mysqlTable("user_behavior", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  customerPhone: varchar("customerPhone", { length: 20 }).notNull(),
+  action: mysqlEnum("action", ["message", "order", "quote", "click", "view", "search", "rating"]).notNull(),
+  category: varchar("category", { length: 80 }),
+  productId: int("productId"),
+  value: decimal("value", { precision: 10, scale: 2 }),
+  metadata: json("metadata").$type<Record<string, any>>(),
+  dayOfWeek: int("dayOfWeek").notNull(), // 0-6 (domingo-sábado)
+  hourOfDay: int("hourOfDay").notNull(), // 0-23
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type UserBehavior = typeof userBehavior.$inferSelect;
+export type InsertUserBehavior = typeof userBehavior.$inferInsert;
+
+/**
+ * Subscriptions - Assinaturas das empresas
+ */
+export const subscriptions = mysqlTable("subscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  userId: int("userId").notNull(), // Usuário que fez a assinatura
+  planType: mysqlEnum("planType", ["free", "basico", "destaque", "premium", "enterprise"]).default("free").notNull(),
+  status: mysqlEnum("status", ["active", "cancelled", "expired", "pending", "trial"]).default("pending").notNull(),
+  // Limites do plano
+  messagesLimit: int("messagesLimit").default(200).notNull(),
+  messagesUsed: int("messagesUsed").default(0).notNull(),
+  aiEnabled: boolean("aiEnabled").default(false).notNull(), // IA habilitada neste plano
+  whatsappEnabled: boolean("whatsappEnabled").default(false).notNull(), // WhatsApp habilitado
+  // Billing
+  priceMonthly: decimal("priceMonthly", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  gatewayId: varchar("gatewayId", { length: 255 }), // ID no gateway de pagamento (Stripe, etc)
+  gatewayCustomerId: varchar("gatewayCustomerId", { length: 255 }),
+  // Datas
+  trialEndsAt: timestamp("trialEndsAt"),
+  currentPeriodStart: timestamp("currentPeriodStart").defaultNow().notNull(),
+  currentPeriodEnd: timestamp("currentPeriodEnd"),
+  cancelledAt: timestamp("cancelledAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Subscription = typeof subscriptions.$inferSelect;
+export type InsertSubscription = typeof subscriptions.$inferInsert;
+
+/**
+ * Referrals - Sistema de indicação viral
+ */
+export const referrals = mysqlTable("referrals", {
+  id: int("id").autoincrement().primaryKey(),
+  referrerCompanyId: int("referrerCompanyId").notNull(), // Empresa que indicou
+  referredCompanyId: int("referredCompanyId"), // Empresa indicada (depois de criar conta)
+  referralCode: varchar("referralCode", { length: 20 }).notNull().unique(),
+  // Recompensas
+  rewardGiven: boolean("rewardGiven").default(false).notNull(),
+  rewardType: mysqlEnum("rewardType", ["messages", "discount", "trial_extension"]).default("messages").notNull(),
+  rewardAmount: int("rewardAmount").default(1000).notNull(), // Mensagens extras ou % desconto
+  // Status
+  status: mysqlEnum("status", ["pending", "completed", "expired"]).default("pending").notNull(),
+  usedAt: timestamp("usedAt"),
+  expiresAt: timestamp("expiresAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Referral = typeof referrals.$inferSelect;
+export type InsertReferral = typeof referrals.$inferInsert;
+
+/**
+ * Company Metrics - Métricas agregadas por empresa
+ */
+export const companyMetrics = mysqlTable("company_metrics", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  date: timestamp("date").notNull(),
+  // Conversas
+  conversationsStarted: int("conversationsStarted").default(0).notNull(),
+  conversationsClosed: int("conversationsClosed").default(0).notNull(),
+  messagesReceived: int("messagesReceived").default(0).notNull(),
+  messagesSent: int("messagesSent").default(0).notNull(),
+  aiResponses: int("aiResponses").default(0).notNull(),
+  humanResponses: int("humanResponses").default(0).notNull(),
+  // CRM
+  newLeads: int("newLeads").default(0).notNull(),
+  hotLeads: int("hotLeads").default(0).notNull(), // Lead score > 70
+  // Conversões
+  quotesRequested: int("quotesRequested").default(0).notNull(),
+  ordersCreated: int("ordersCreated").default(0).notNull(),
+  ordersValue: decimal("ordersValue", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  conversionRate: decimal("conversionRate", { precision: 5, scale: 2 }).default("0.00").notNull(),
+  // Engajamento
+  averageResponseTime: int("averageResponseTime").default(0).notNull(), // segundos
+  customerSatisfaction: decimal("customerSatisfaction", { precision: 3, scale: 2 }).default("0.00").notNull(), // 0-5
+  // Score de engajamento (anti-churn)
+  engagementScore: int("engagementScore").default(100).notNull(), // 0-100
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CompanyMetric = typeof companyMetrics.$inferSelect;
+export type InsertCompanyMetric = typeof companyMetrics.$inferInsert;
+
+/**
+ * WhatsApp Sessions - Sessões do WhatsApp Web para whatsapp-web.js
+ */
+export const whatsappSessions = mysqlTable("whatsapp_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull().unique(),
+  phone: varchar("phone", { length: 20 }), // Número conectado
+  // Status
+  status: mysqlEnum("status", ["disconnected", "qr_pending", "connecting", "connected", "failed"]).default("disconnected").notNull(),
+  // Dados da sessão (serializado)
+  sessionData: text("sessionData"), // JSON serializado da sessão
+  // QR Code
+  lastQrCode: text("lastQrCode"),
+  qrExpiresAt: timestamp("qrExpiresAt"),
+  // Conexão
+  connectedAt: timestamp("connectedAt"),
+  disconnectedAt: timestamp("disconnectedAt"),
+  lastActivityAt: timestamp("lastActivityAt"),
+  // Erros
+  lastError: text("lastError"),
+  failureCount: int("failureCount").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type WhatsappSession = typeof whatsappSessions.$inferSelect;
+export type InsertWhatsappSession = typeof whatsappSessions.$inferInsert;
+
+/**
+ * Notification Queue - Fila de notificações proativas
+ */
+export const notificationQueue = mysqlTable("notification_queue", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  customerPhone: varchar("customerPhone", { length: 20 }).notNull(),
+  type: mysqlEnum("type", ["recommendation", "promotion", "reminder", "follow_up", "upsell"]).notNull(),
+  channel: mysqlEnum("channel", ["whatsapp", "push", "sms"]).default("whatsapp").notNull(),
+  message: text("message").notNull(),
+  // Agendamento
+  scheduledFor: timestamp("scheduledFor").notNull(),
+  sentAt: timestamp("sentAt"),
+  // Status
+  status: mysqlEnum("status", ["pending", "sent", "failed", "cancelled"]).default("pending").notNull(),
+  error: text("error"),
+  // Metadados
+  metadata: json("metadata").$type<{
+    triggeredBy?: string;
+    productId?: number;
+    orderId?: number;
+  }>(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type NotificationQueue = typeof notificationQueue.$inferSelect;
+export type InsertNotificationQueue = typeof notificationQueue.$inferInsert;

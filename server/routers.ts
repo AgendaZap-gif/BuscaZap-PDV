@@ -5,10 +5,143 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
+import { buildCompanyPrompt, companyToBrainData, parseDataBlock, type DataBlock } from "./_core/buscazapBrain";
+import { geminiChat, toGeminiMessages, isGeminiConfigured } from "./_core/gemini";
 
 export const appRouter = router({
   system: systemRouter,
-  
+
+  // ==================== CÉREBRO BUSCAZAP (IA por empresa) ====================
+  companyAi: router({
+    /** Verifica se a IA (Gemini) está configurada. */
+    isConfigured: publicProcedure.query(() => ({
+      configured: isGeminiConfigured(),
+    })),
+
+    /**
+     * Envia mensagens e recebe resposta da IA da empresa.
+     * Salva conversa, atualiza CRM e comportamento.
+     */
+    reply: publicProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          messages: z.array(z.object({ role: z.enum(["user", "assistant", "system"]), content: z.string() })),
+          customerPhone: z.string().optional(),
+          channel: z.enum(["whatsapp", "app", "web", "telegram"]).optional(),
+          knowledgeBaseOverride: z.string().optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        if (!isGeminiConfigured()) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "IA não configurada. Defina GEMINI_API_KEY no servidor." });
+        }
+
+        const company = await db.getCompanyById(input.companyId);
+        if (!company) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Empresa não encontrada." });
+        }
+
+        const customerPhone = input.customerPhone ?? "anonymous";
+        const channel = input.channel ?? "app";
+
+        const conv = await db.getOrCreateConversation(
+          input.companyId,
+          customerPhone,
+          channel,
+          undefined
+        );
+
+        const history = await db.getConversationMessages(conv.id, 30);
+        const historyForLlm = history.reverse().map((m) => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.content,
+        }));
+
+        const lastUser = input.messages.filter((m) => m.role === "user").pop();
+        const userContent = lastUser?.content ?? input.messages[input.messages.length - 1]?.content ?? "";
+
+        if (userContent.trim()) {
+          await db.addMessageToConversation(conv.id, input.companyId, "customer", userContent.trim(), channel);
+        }
+
+        const knowledgeBase =
+          input.knowledgeBaseOverride ??
+          (await db.getCompanyKnowledgeForBrain(input.companyId));
+        const userBehaviorData = await db.getUserBehaviorSummaryForBrain(input.companyId, customerPhone);
+
+        const companyData = companyToBrainData(company, undefined);
+        const systemPrompt = buildCompanyPrompt(companyData, {
+          company_knowledge_base: knowledgeBase,
+          user_behavior_data: userBehaviorData,
+        });
+
+        const allMessages = [
+          ...historyForLlm,
+          ...input.messages
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        ];
+        if (allMessages.length === 0 && userContent.trim()) {
+          allMessages.push({ role: "user" as const, content: userContent.trim() });
+        }
+
+        const geminiMessages = toGeminiMessages(allMessages);
+        const result = await geminiChat({
+          systemInstruction: systemPrompt,
+          messages: geminiMessages,
+          maxOutputTokens: 2048,
+          temperature: 0.7,
+        });
+
+        const { text, dataBlock } = parseDataBlock(result.text);
+
+        const aiMetadata: DataBlock | undefined = dataBlock
+          ? {
+              intent: dataBlock.intent,
+              lead_score: dataBlock.lead_score,
+              tags: dataBlock.tags,
+              products: dataBlock.products,
+              next_action: dataBlock.next_action,
+              crm_update: dataBlock.crm_update,
+            }
+          : undefined;
+
+        await db.addMessageToConversation(
+          conv.id,
+          input.companyId,
+          "assistant",
+          text,
+          channel,
+          aiMetadata
+            ? {
+                intent: aiMetadata.intent,
+                leadScore: aiMetadata.lead_score,
+                tags: aiMetadata.tags,
+                products: aiMetadata.products,
+                nextAction: aiMetadata.next_action,
+                crmUpdate: aiMetadata.crm_update,
+              }
+            : undefined
+        );
+
+        if (dataBlock && customerPhone !== "anonymous") {
+          await db.upsertCrmFromDataBlock(input.companyId, customerPhone, {
+            lead_score: dataBlock.lead_score,
+            tags: dataBlock.tags,
+            crm_update: dataBlock.crm_update,
+          });
+          await db.trackUserBehavior(input.companyId, customerPhone, "message");
+        }
+
+        return {
+          text,
+          dataBlock: dataBlock ?? undefined,
+          model: result.model,
+        };
+      }),
+  }),
+
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
