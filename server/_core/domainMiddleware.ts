@@ -1,5 +1,7 @@
 /**
- * White label - detectar empresa por domínio (req.headers.host).
+ * White label (opcional): detectar empresa por domínio (req.headers.host).
+ * Usado apenas se houver um subdomínio por tenant (ex.: loja-x.buscazap.com.br → empresa X).
+ * No cenário atual (pdv.buscazapbrasil.com.br = uma URL, login por empresa), a empresa vem da sessão; este middleware só preenche req.companyIdByDomain quando encontrar company.domain = host.
  */
 
 import * as db from "../db.js";

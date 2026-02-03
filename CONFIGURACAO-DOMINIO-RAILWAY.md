@@ -188,15 +188,18 @@ const distPath = path.resolve(__dirname, "public");
 
 ### Erro: `Unknown column 'companies.domain' in 'where clause'` (DrizzleQueryError)
 
-**Causa**: A tabela `companies` no MySQL ainda não tem a coluna `domain`.
+**Causa**: A tabela `companies` no MySQL ainda não tem a coluna `domain`. O middleware tenta usá-la para detecção opcional por domínio (white label).
 
-**Solução**:
-1. Conecte ao MySQL (Railway, DBeaver, etc.) e rode:
+**O que acontece**: Com a correção no código, o app **não crasha**; só registra um aviso no log e segue. O PDV continua funcionando normalmente (empresa definida pelo login).
+
+**Solução (opcional, só para tirar o aviso do log)**:
+1. Conecte ao MySQL e rode:
    ```sql
    ALTER TABLE `companies` ADD COLUMN `domain` VARCHAR(255) NULL;
    ```
-2. Ou execute o arquivo `drizzle/migrations/0011_add_companies_domain.sql`
-3. Depois de aplicar, reinicie o app. O middleware passará a preencher `req.companyIdByDomain` quando o host bater com `companies.domain`
+2. Ou execute `drizzle/migrations/0011_add_companies_domain.sql`
+
+Não é obrigatório para o uso atual (uma URL, login por empresa).
 
 ---
 
