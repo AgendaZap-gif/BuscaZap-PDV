@@ -26,9 +26,24 @@ export async function detectCompanyByDomain(req: Request, _res: Response, next: 
     next();
     return;
   }
-  const rows = await drizzleDb.select({ id: companies.id }).from(companies).where(eq(companies.domain, host)).limit(1);
-  if (rows.length > 0) {
-    req.companyIdByDomain = rows[0].id;
+  try {
+    const rows = await drizzleDb
+      .select({ id: companies.id })
+      .from(companies)
+      .where(eq(companies.domain, host))
+      .limit(1);
+    if (rows.length > 0) {
+      req.companyIdByDomain = rows[0].id;
+    }
+  } catch (err: unknown) {
+    const cause = (err as { cause?: { code?: string } })?.cause;
+    if (cause?.code === "ER_BAD_FIELD_ERROR") {
+      console.warn(
+        "[domainMiddleware] Coluna companies.domain não existe. Rode a migração: drizzle/migrations/0011_add_companies_domain.sql",
+      );
+    } else {
+      console.error("[domainMiddleware] Erro ao detectar empresa por domínio:", err);
+    }
   }
   next();
 }

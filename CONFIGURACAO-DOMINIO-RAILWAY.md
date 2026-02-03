@@ -186,6 +186,18 @@ const distPath = path.resolve(__dirname, "public");
 2. Certifique-se de que todas as variáveis de ambiente estão configuradas
 3. Verifique se o `GOOGLE_CLIENT_SECRET` está configurado
 
+### Erro: `Unknown column 'companies.domain' in 'where clause'` (DrizzleQueryError)
+
+**Causa**: A tabela `companies` no MySQL ainda não tem a coluna `domain`.
+
+**Solução**:
+1. Conecte ao MySQL (Railway, DBeaver, etc.) e rode:
+   ```sql
+   ALTER TABLE `companies` ADD COLUMN `domain` VARCHAR(255) NULL;
+   ```
+2. Ou execute o arquivo `drizzle/migrations/0011_add_companies_domain.sql`
+3. Depois de aplicar, reinicie o app. O middleware passará a preencher `req.companyIdByDomain` quando o host bater com `companies.domain`
+
 ---
 
 ## Variáveis de Ambiente Necessárias
@@ -224,11 +236,36 @@ Após configurar o domínio, você precisa atualizar o Google Cloud Console:
 
 ---
 
+## Migração do banco: coluna `companies.domain`
+
+Para o white label por domínio funcionar (ex.: `pdv.buscazapbrasil.com.br` → empresa X), a tabela `companies` precisa da coluna `domain`. Se aparecer no log:
+
+```
+[domainMiddleware] Coluna companies.domain não existe. Rode a migração: ...
+```
+
+rode no MySQL (DBeaver, Railway MySQL console, etc.):
+
+```sql
+ALTER TABLE `companies` ADD COLUMN `domain` VARCHAR(255) NULL;
+```
+
+Ou execute o arquivo: `drizzle/migrations/0011_add_companies_domain.sql`
+
+Depois, preencha o domínio na empresa que usa esse subdomínio:
+
+```sql
+UPDATE companies SET domain = 'pdv.buscazapbrasil.com.br' WHERE id = SEU_ID_DA_EMPRESA;
+```
+
+---
+
 ## Checklist Final
 
 - [ ] Domínio adicionado no Railway
 - [ ] Registro DNS (CNAME ou A) criado no provedor
 - [ ] DNS propagado (verificado com dnschecker.org)
+- [ ] **Coluna `companies.domain` criada e preenchida** (ver seção acima)
 - [ ] Variáveis `PUBLIC_API_URL` e `EXPO_PUBLIC_API_BASE_URL` atualizadas no Railway
 - [ ] Google OAuth callback URI atualizado
 - [ ] Certificado SSL gerado pelo Railway (status "Active")
