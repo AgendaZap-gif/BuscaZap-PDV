@@ -12,8 +12,8 @@
  * Depois copie a saída (só o SQL) e execute no DBeaver.
  */
 
-const bcrypt = require("bcryptjs");
-const crypto = require("crypto");
+import bcrypt from "bcryptjs";
+import crypto from "node:crypto";
 
 const email = process.argv[2] || "secretaria@teste.com";
 const senha = process.argv[3] || "senha123";
