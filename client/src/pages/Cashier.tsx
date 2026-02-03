@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageNav } from "@/components/PageNav";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -108,15 +109,20 @@ export default function CashierPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <p>Carregando...</p>
-      </div>
+      <>
+        <PageNav title="PDV Caixa" backPath="/" />
+        <div className="container mx-auto p-6">
+          <p>Carregando...</p>
+        </div>
+      </>
     );
   }
 
   if (!activeRegister) {
     return (
-      <div className="container mx-auto p-6">
+      <>
+        <PageNav title="PDV Caixa" backPath="/" />
+        <div className="container mx-auto p-6">
         <Card>
           <CardHeader>
             <CardTitle>Caixa Fechado</CardTitle>
@@ -152,14 +158,17 @@ export default function CashierPage() {
             </Dialog>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <>
+      <PageNav title="PDV Caixa" backPath="/" />
+      <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Caixa</h1>
+        <h2 className="text-2xl font-bold">Caixa</h2>
         <Dialog open={isCloseDialogOpen} onOpenChange={setIsCloseDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="destructive">
@@ -347,5 +356,6 @@ export default function CashierPage() {
         </Card>
       </div>
     </div>
+    </>
   );
 }

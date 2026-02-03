@@ -1,16 +1,14 @@
-import { useAuth } from "@/_core/hooks/useAuth";
+import { PageNav } from "@/components/PageNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-import { useLocation, useParams } from "wouter";
-import { toast } from "sonner";
+import { Plus, Trash2 } from "lucide-react";
+import { useParams } from "wouter";
 import AddProductDialog from "@/components/AddProductDialog";
 import { useState } from "react";
 
 export default function Order() {
   const { id } = useParams();
-  const [, setLocation] = useLocation();
   const orderId = parseInt(id || "0");
   const [showAddProduct, setShowAddProduct] = useState(false);
 
@@ -25,23 +23,12 @@ export default function Order() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="container py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/tables")}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Comanda {order?.orderNumber}</h1>
-              <p className="text-sm text-muted-foreground">Mesa {order?.tableId}</p>
-            </div>
-          </div>
-          <Button onClick={() => setShowAddProduct(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Adicionar Item
-          </Button>
-        </div>
-      </div>
+      <PageNav title={`Comanda ${order?.orderNumber} · Mesa ${order?.tableId}`} backPath="/tables">
+        <Button onClick={() => setShowAddProduct(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          Adicionar Item
+        </Button>
+      </PageNav>
 
       <div className="container py-8">
         <div className="grid lg:grid-cols-3 gap-6">

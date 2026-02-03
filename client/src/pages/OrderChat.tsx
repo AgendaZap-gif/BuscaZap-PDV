@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "wouter";
+import { PageNav } from "@/components/PageNav";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft } from "lucide-react";
-import { useLocation } from "wouter";
+import { Send } from "lucide-react";
 import { useWebSocket } from "@/hooks/useWebSocket";
 
 export default function OrderChat() {
   const params = useParams<{ orderId: string }>();
   const orderId = parseInt(params.orderId || "0");
-  const [, setLocation] = useLocation();
   const [message, setMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
@@ -90,27 +89,23 @@ export default function OrderChat() {
 
   if (isLoading) {
     return (
-      <div className="container max-w-2xl py-8">
-        <p className="text-center text-muted-foreground">Carregando chat...</p>
-      </div>
+      <>
+        <PageNav title={`Chat - Pedido #${orderId}`} backPath="/buscazap-orders" />
+        <div className="container max-w-2xl py-8">
+          <p className="text-center text-muted-foreground">Carregando chat...</p>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="container max-w-2xl py-4 h-screen flex flex-col">
+    <>
+      <PageNav title={`Chat - Pedido #${orderId}`} backPath="/buscazap-orders" />
+      <div className="container max-w-2xl py-4 flex flex-col">
       {/* Header */}
       <Card className="mb-4">
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocation("/buscazap-orders")}
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <CardTitle>Chat - Pedido #{orderId}</CardTitle>
-          </div>
+          <CardTitle>Pedido #{orderId}</CardTitle>
         </CardHeader>
       </Card>
 
@@ -201,5 +196,6 @@ export default function OrderChat() {
         </div>
       </Card>
     </div>
+    </>
   );
 }

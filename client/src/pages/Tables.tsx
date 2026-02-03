@@ -1,8 +1,9 @@
+import { PageNav } from "@/components/PageNav";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Plus, Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -78,31 +79,16 @@ export default function Tables() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="container py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setLocation("/")}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold">Gestão de Mesas</h1>
-              <p className="text-sm text-muted-foreground">
-                {tables?.length || 0} mesas cadastradas
-              </p>
-            </div>
-          </div>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Nova Mesa
-          </Button>
-        </div>
-      </div>
-
-      <div className="container py-8">
+      <PageNav title="Gestão de Mesas" backPath="/">
+        <Button>
+          <Plus className="w-4 h-4 mr-2" />
+          Nova Mesa
+        </Button>
+      </PageNav>
+      <div className="container py-6">
+        <p className="text-sm text-muted-foreground mb-4">
+          {tables?.length || 0} mesas cadastradas
+        </p>
         {!tables || tables.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageNav } from "@/components/PageNav";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -161,11 +162,14 @@ export default function BuscaZapOrders() {
 
   if (isLoading) {
     return (
-      <div className="container max-w-7xl py-8">
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Carregando pedidos...</p>
+      <>
+        <PageNav title="Pedidos BuscaZap" backPath="/" />
+        <div className="container max-w-7xl py-8">
+          <div className="flex items-center justify-center h-64">
+            <p className="text-muted-foreground">Carregando pedidos...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -173,9 +177,11 @@ export default function BuscaZapOrders() {
   const activeOrders = orders?.filter(o => ["sent_to_kitchen", "preparing", "ready"].includes(o.status)) || [];
 
   return (
-    <div className="container max-w-7xl py-8">
+    <>
+      <PageNav title="Pedidos BuscaZap" backPath="/" />
+      <div className="container max-w-7xl py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Pedidos Externos</h1>
+        <h2 className="text-2xl font-bold">Pedidos Externos</h2>
         <p className="text-muted-foreground mt-2">
           Gerencie pedidos recebidos de todas as plataformas (BuscaZap, Pedijá, Iffod, 99Food, Rappi, Uber Eats, iFood, etc.)
         </p>
@@ -399,5 +405,6 @@ export default function BuscaZapOrders() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   );
 }

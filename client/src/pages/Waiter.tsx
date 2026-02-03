@@ -1,26 +1,17 @@
+import { PageNav } from "@/components/PageNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Plus } from "lucide-react";
-import { useLocation } from "wouter";
+import { Plus } from "lucide-react";
 
 export default function Waiter() {
-  const [, setLocation] = useLocation();
   const companyId = 1;
 
   const { data: tables } = trpc.tables.list.useQuery({ companyId });
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="container py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="text-2xl font-bold">Modo Garçom</h1>
-        </div>
-      </div>
-
+      <PageNav title="Modo Garçom" backPath="/" />
       <div className="container py-8">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {tables?.filter(t => t.status === "occupied").map((table) => (

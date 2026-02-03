@@ -1,3 +1,4 @@
+import { PageNav } from "@/components/PageNav";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Star, TrendingUp, MessageSquare } from "lucide-react";
@@ -15,9 +16,12 @@ export default function Ratings() {
 
   if (statsLoading || ratingsLoading) {
     return (
-      <div className="container max-w-7xl py-8">
-        <p className="text-center text-muted-foreground">Carregando avaliações...</p>
-      </div>
+      <>
+        <PageNav title="Avaliações" backPath="/" />
+        <div className="container max-w-7xl py-8">
+          <p className="text-center text-muted-foreground">Carregando avaliações...</p>
+        </div>
+      </>
     );
   }
 
@@ -39,9 +43,11 @@ export default function Ratings() {
   };
 
   return (
-    <div className="container max-w-7xl py-8">
+    <>
+      <PageNav title="Avaliações" backPath="/" />
+      <div className="container max-w-7xl py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">Avaliações dos Clientes</h1>
+        <h2 className="text-2xl font-bold">Avaliações dos Clientes</h2>
         <p className="text-muted-foreground mt-2">
           Feedback dos pedidos do BuscaZap
         </p>
@@ -194,5 +200,6 @@ export default function Ratings() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

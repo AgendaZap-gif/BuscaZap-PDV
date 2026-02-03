@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { PageNav } from '@/components/PageNav';
 import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,16 +68,21 @@ export default function DeliveryControl() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <>
+        <PageNav title="Controle de Delivery" backPath="/" />
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </>
     );
   }
 
   // Se não está ativo no PediJá, mostrar tela de ativação
   if (!settings?.isOnPedija) {
     return (
-      <div className="container mx-auto p-6 max-w-2xl">
+      <>
+        <PageNav title="Controle de Delivery" backPath="/" />
+        <div className="container mx-auto p-6 max-w-2xl">
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Ativar no PediJá</CardTitle>
@@ -124,7 +130,8 @@ export default function DeliveryControl() {
             </Button>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -132,10 +139,12 @@ export default function DeliveryControl() {
   const isOnline = settings.isOnlineForOrders;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <>
+      <PageNav title="Controle de Delivery" backPath="/" />
+      <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Controle de Delivery</h1>
+          <h2 className="text-2xl font-bold">Status PediJá</h2>
           <p className="text-muted-foreground">Gerencie o status online do PediJá</p>
         </div>
         <Badge variant={isOnline ? 'default' : 'secondary'} className="text-lg px-4 py-2">
@@ -268,5 +277,6 @@ export default function DeliveryControl() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

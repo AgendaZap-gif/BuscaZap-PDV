@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PageNav } from '@/components/PageNav';
 import { trpc } from '@/lib/trpc';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -112,7 +113,9 @@ export default function ManageDrivers() {
   // Se não tem permissão para entregadores próprios
   if (!settings?.hasOwnDrivers) {
     return (
-      <div className="container mx-auto p-6 max-w-3xl">
+      <>
+        <PageNav title="Entregadores Próprios" backPath="/" />
+        <div className="container mx-auto p-6 max-w-3xl">
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Entregadores Próprios</CardTitle>
@@ -195,7 +198,8 @@ export default function ManageDrivers() {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </>
     );
   }
 
@@ -204,10 +208,12 @@ export default function ManageDrivers() {
   const maxDrivers = settings?.maxDrivers || 0;
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <>
+      <PageNav title="Entregadores Próprios" backPath="/" />
+      <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Entregadores Próprios</h1>
+          <h2 className="text-2xl font-bold">Entregadores Próprios</h2>
           <p className="text-muted-foreground">Gerencie seus entregadores exclusivos</p>
         </div>
         <Badge variant="secondary" className="text-lg px-4 py-2">
@@ -351,5 +357,6 @@ export default function ManageDrivers() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

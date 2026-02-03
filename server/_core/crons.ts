@@ -45,58 +45,69 @@ async function getUsersToRecommend(dayOfWeek: number): Promise<Array<{
 }>> {
   const drizzleDb = await db.getDb();
   if (!drizzleDb) return [];
-  const { userBehavior } = await import("../../drizzle/schema.js");
-  const { companies } = await import("../../drizzle/schema.js");
-  const { eq, sql } = await import("drizzle-orm");
-  const rows = await drizzleDb
-    .select({
-      companyId: userBehavior.companyId,
-      customerPhone: userBehavior.customerPhone,
-      category: userBehavior.category,
-      total: sql<number>`count(*)`.as("total"),
-    })
-    .from(userBehavior)
-    .where(eq(userBehavior.dayOfWeek, dayOfWeek))
-    .groupBy(userBehavior.companyId, userBehavior.customerPhone, userBehavior.category);
-  const filtered = rows.filter((r) => (r.total as number) >= 2);
-  const result: Array<{
-    companyId: number;
-    customerPhone: string;
-    category: string;
-    companyName: string;
-    companyCategory: string;
-  }> = [];
-  for (const r of filtered) {
-    const company = await db.getCompanyById(r.companyId);
-    const settings = (company?.settings as Record<string, string> | undefined) ?? {};
-    result.push({
-      companyId: r.companyId,
-      customerPhone: r.customerPhone,
-      category: r.category ?? "novidades",
-      companyName: company?.name ?? "Empresa",
-      companyCategory: settings.category ?? "",
-    });
+  try {
+    const { userBehavior } = await import("../../drizzle/schema.js");
+    const { eq, sql } = await import("drizzle-orm");
+    const rows = await drizzleDb
+      .select({
+        companyId: userBehavior.companyId,
+        customerPhone: userBehavior.customerPhone,
+        category: userBehavior.category,
+        total: sql<number>`count(*)`.as("total"),
+      })
+      .from(userBehavior)
+      .where(eq(userBehavior.dayOfWeek, dayOfWeek))
+      .groupBy(userBehavior.companyId, userBehavior.customerPhone, userBehavior.category);
+    const filtered = rows.filter((r) => (r.total as number) >= 2);
+    const result: Array<{
+      companyId: number;
+      customerPhone: string;
+      category: string;
+      companyName: string;
+      companyCategory: string;
+    }> = [];
+    for (const r of filtered) {
+      const company = await db.getCompanyById(r.companyId);
+      const settings = (company?.settings as Record<string, string> | undefined) ?? {};
+      result.push({
+        companyId: r.companyId,
+        customerPhone: r.customerPhone,
+        category: r.category ?? "novidades",
+        companyName: company?.name ?? "Empresa",
+        companyCategory: settings.category ?? "",
+      });
+    }
+    return result;
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code;
+    if (code === "ER_NO_SUCH_TABLE") {
+      return [];
+    }
+    throw err;
   }
-  return result;
 }
 
 /** Envia mensagem proativa por empresa e categoria (delivery, roupas, agro, serviços, etc.). */
 async function runProactiveRecommendations(): Promise<void> {
-  const today = new Date().getDay();
-  const users = await getUsersToRecommend(today);
-  for (const u of users) {
-    try {
-      const message = getRecommendationMessage(u.companyName, u.companyCategory, u.category);
-      await db.enqueueNotification({
-        companyId: u.companyId,
-        customerPhone: normalizePhone(u.customerPhone),
-        type: "recommendation",
-        message,
-        scheduledFor: new Date(),
-      });
-    } catch (e) {
-      console.warn("[Cron] Recommendation enqueue failed:", e);
+  try {
+    const today = new Date().getDay();
+    const users = await getUsersToRecommend(today);
+    for (const u of users) {
+      try {
+        const message = getRecommendationMessage(u.companyName, u.companyCategory, u.category);
+        await db.enqueueNotification({
+          companyId: u.companyId,
+          customerPhone: normalizePhone(u.customerPhone),
+          type: "recommendation",
+          message,
+          scheduledFor: new Date(),
+        });
+      } catch (e) {
+        console.warn("[Cron] Recommendation enqueue failed:", e);
+      }
     }
+  } catch (e) {
+    console.warn("[Cron] runProactiveRecommendations skipped (e.g. user_behavior table missing):", (e as Error)?.message ?? e);
   }
 }
 

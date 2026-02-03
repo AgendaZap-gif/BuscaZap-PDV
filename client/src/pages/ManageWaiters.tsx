@@ -13,8 +13,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, UserPlus, Trash2 } from "lucide-react";
-import { useLocation } from "wouter";
+import { PageNav } from "@/components/PageNav";
+import { UserPlus, Trash2 } from "lucide-react";
 
 export default function ManageWaiters() {
   const [, setLocation] = useLocation();
@@ -93,21 +93,15 @@ export default function ManageWaiters() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="container py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Gestão de Garçons</h1>
-            <p className="text-sm text-muted-foreground">
-              Crie login e senha para os garçons usarem no app BuscaZap (Modo Garçom)
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="container py-8">
+      <PageNav
+        title="Gestão de Garçons"
+        backPath="/"
+      />
+      <div className="container py-6">
+        <p className="text-sm text-muted-foreground mb-4">
+          Crie login e senha para os garçons usarem no app BuscaZap (Modo Garçom)
+        </p>
+      <div className="py-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -210,6 +204,7 @@ export default function ManageWaiters() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

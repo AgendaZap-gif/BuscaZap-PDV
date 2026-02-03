@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageNav } from "@/components/PageNav";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -145,12 +146,14 @@ export default function Products() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50">
+      <PageNav title="Produtos" backPath="/" />
+      <div className="p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Produtos</h1>
+            <h2 className="text-2xl font-bold text-gray-900">Cardápio</h2>
             <p className="text-gray-600">Gerencie o cardápio do restaurante</p>
           </div>
           
@@ -411,6 +414,7 @@ export default function Products() {
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

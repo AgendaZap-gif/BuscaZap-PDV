@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageNav } from "@/components/PageNav";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,11 +25,14 @@ export default function BuscaZapStats() {
 
   if (isLoading) {
     return (
-      <div className="container max-w-7xl py-8">
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Carregando estatísticas...</p>
+      <>
+        <PageNav title="Estatísticas BuscaZap" backPath="/" />
+        <div className="container max-w-7xl py-8">
+          <div className="flex items-center justify-center h-64">
+            <p className="text-muted-foreground">Carregando estatísticas...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -88,7 +92,9 @@ export default function BuscaZapStats() {
   , { day: "", count: 0 });
 
   return (
-    <div className="container max-w-7xl py-8">
+    <>
+      <PageNav title="Estatísticas BuscaZap" backPath="/" />
+      <div className="container max-w-7xl py-8">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Estatísticas BuscaZap</h1>
@@ -238,5 +244,6 @@ export default function BuscaZapStats() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { PageNav } from "@/components/PageNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -83,16 +84,9 @@ export default function SelectCompany() {
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-6 max-w-2xl mx-auto">
-      <Button
-        variant="ghost"
-        className="mb-4"
-        onClick={() => setLocation("/")}
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Voltar
-      </Button>
-
+    <div className="min-h-screen">
+      <PageNav title="Trocar Empresa" backPath="/" />
+      <div className="p-4 md:p-6 max-w-2xl mx-auto">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -161,6 +155,7 @@ export default function SelectCompany() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

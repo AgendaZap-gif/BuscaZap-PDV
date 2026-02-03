@@ -2,11 +2,11 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLoginUrl, getSiteSecretariaUrl } from "@/const";
-import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone, Star, Bike, Users, UserPlus, CalendarCheck } from "lucide-react";
+import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone, Star, Bike, Users, UserPlus, CalendarCheck, LogOut } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Home() {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const [, setLocation] = useLocation();
 
   if (loading) {
@@ -185,12 +185,20 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="mt-8">
+        <div className="mt-8 flex gap-3">
           <Button
             variant="outline"
             onClick={() => setLocation("/select-company")}
           >
             Trocar Empresa
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => logout()}
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Sair
           </Button>
         </div>
       </div>
