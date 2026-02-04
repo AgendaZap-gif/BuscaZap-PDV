@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getEvento, createEvento, updateEvento } from "../services/api";
+import { getEvento, createEvento, updateEvento, uploadEventoImage } from "../services/api";
 import QRCodeExport from "../components/QRCodeExport";
 
 export default function EventoForm() {
@@ -10,6 +10,8 @@ export default function EventoForm() {
 
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [uploadingMapa, setUploadingMapa] = useState(false);
   const [form, setForm] = useState({
     nome: "",
     cidade: "",
@@ -47,6 +49,24 @@ export default function EventoForm() {
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleUpload = async (field, file) => {
+    if (!file || !file.type.startsWith("image/")) {
+      alert("Selecione uma imagem (JPG, PNG, etc.).");
+      return;
+    }
+    const tipo = field === "bannerUrl" ? "banner" : "mapa";
+    const setUploading = field === "bannerUrl" ? setUploadingBanner : setUploadingMapa;
+    setUploading(true);
+    try {
+      const { url } = await uploadEventoImage(file, tipo);
+      setForm((prev) => ({ ...prev, [field]: url }));
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao enviar imagem.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -114,22 +134,70 @@ export default function EventoForm() {
             </div>
           </div>
           <div className="form-group">
-            <label>URL do banner</label>
+            <label>Banner</label>
+            <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.5rem" }}>
+              Use o link (URL) ou envie uma imagem. Se enviar arquivo, o sistema salva e gera o link automaticamente.
+            </p>
             <input
               type="url"
               value={form.bannerUrl}
               onChange={(e) => handleChange("bannerUrl", e.target.value)}
               placeholder="https://..."
+              style={{ marginBottom: "0.5rem" }}
             />
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <label style={{ margin: 0, fontWeight: "normal", fontSize: "0.9rem" }}>Ou envie uma imagem:</label>
+              <input
+                type="file"
+                accept="image/*"
+                disabled={uploadingBanner}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleUpload("bannerUrl", f);
+                  e.target.value = "";
+                }}
+                style={{ maxWidth: "280px" }}
+              />
+              {uploadingBanner && <span style={{ fontSize: "0.85rem", color: "#64748b" }}>Enviando...</span>}
+            </div>
+            {form.bannerUrl && (
+              <p style={{ marginTop: "0.5rem", fontSize: "0.8rem" }}>
+                <a href={form.bannerUrl} target="_blank" rel="noopener noreferrer">Ver imagem atual</a>
+              </p>
+            )}
           </div>
           <div className="form-group">
-            <label>URL do mapa (imagem)</label>
+            <label>Mapa (imagem)</label>
+            <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.5rem" }}>
+              Use o link (URL) ou envie uma imagem do mapa.
+            </p>
             <input
               type="url"
               value={form.mapaUrl}
               onChange={(e) => handleChange("mapaUrl", e.target.value)}
               placeholder="https://..."
+              style={{ marginBottom: "0.5rem" }}
             />
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+              <label style={{ margin: 0, fontWeight: "normal", fontSize: "0.9rem" }}>Ou envie uma imagem:</label>
+              <input
+                type="file"
+                accept="image/*"
+                disabled={uploadingMapa}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleUpload("mapaUrl", f);
+                  e.target.value = "";
+                }}
+                style={{ maxWidth: "280px" }}
+              />
+              {uploadingMapa && <span style={{ fontSize: "0.85rem", color: "#64748b" }}>Enviando...</span>}
+            </div>
+            {form.mapaUrl && (
+              <p style={{ marginTop: "0.5rem", fontSize: "0.8rem" }}>
+                <a href={form.mapaUrl} target="_blank" rel="noopener noreferrer">Ver imagem atual</a>
+              </p>
+            )}
           </div>
           <div className="form-row">
             <div className="form-group">

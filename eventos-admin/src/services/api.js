@@ -34,6 +34,17 @@ export const listEventos = () => api.get("/admin/eventos").then((r) => r.data);
 export const getEvento = (id) => api.get(`/admin/eventos/${id}`).then((r) => r.data);
 export const createEvento = (data) => api.post("/admin/eventos", data).then((r) => r.data);
 export const updateEvento = (id, data) => api.put(`/admin/eventos/${id}`, data).then((r) => r.data);
+
+/** Upload de imagem (banner ou mapa). file = File; tipo = "banner" | "mapa". Retorna { url } */
+export const uploadEventoImage = (file, tipo = "banner") => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api
+    .post(`/admin/eventos/upload?tipo=${encodeURIComponent(tipo)}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+    .then((r) => r.data);
+};
 export const toggleAtivoEvento = (id, ativo) =>
   api.patch(`/admin/eventos/${id}/ativo`, { ativo }).then((r) => r.data);
 

@@ -1,9 +1,58 @@
 import { Router } from "express";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
 import pool from "../db.js";
 import { requireAdmin, requireMaster, requireEventoAccess } from "../middleware/auth.js";
 
 const router = Router();
 router.use(requireAdmin);
+
+const UPLOAD_DIR = path.join(process.cwd(), "uploads", "eventos");
+for (const sub of ["banner", "mapa"]) {
+  const dir = path.join(UPLOAD_DIR, sub);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function makeUpload(tipo) {
+  const dir = path.join(UPLOAD_DIR, tipo);
+  const storage = multer.diskStorage({
+    destination: (_, __, cb) => cb(null, dir),
+    filename: (_, file, cb) => {
+      const ext = path.extname(file.originalname) || ".jpg";
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  });
+  return multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+  }).single("file");
+}
+
+function getBaseUrl(req) {
+  if (process.env.BASE_URL) return process.env.BASE_URL.replace(/\/$/, "");
+  const proto = req.headers["x-forwarded-proto"] || req.protocol || "http";
+  const host = req.headers["x-forwarded-host"] || req.get("host") || "localhost:3002";
+  return `${proto}://${host}`;
+}
+
+// POST /admin/eventos/upload - upload de imagem; query: tipo=banner|mapa; body: file. Retorna { url }
+router.post("/eventos/upload", (req, res, next) => {
+  const tipo = (req.query?.tipo || "banner").toString().toLowerCase();
+  const dirTipo = tipo === "mapa" ? "mapa" : "banner";
+  const upload = makeUpload(dirTipo);
+  upload(req, res, (err) => {
+    if (err) {
+      if (err.code === "LIMIT_FILE_SIZE") return res.status(400).json({ error: "Arquivo muito grande (máx. 10MB)" });
+      return res.status(400).json({ error: err.message || "Erro no upload" });
+    }
+    if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado" });
+    const rel = `eventos/${dirTipo}/${req.file.filename}`;
+    const url = `${getBaseUrl(req)}/uploads/${rel}`;
+    res.json({ url });
+  });
+});
 
 // GET /admin/eventos - listar todos (master) ou só o evento do produtor
 router.get("/eventos", async (req, res) => {

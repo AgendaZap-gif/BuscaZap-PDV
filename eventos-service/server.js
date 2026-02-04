@@ -1,4 +1,5 @@
 import "dotenv/config";
+import path from "path";
 import express from "express";
 import cors from "cors";
 import eventosRouter from "./routes/eventos.js";
@@ -10,6 +11,9 @@ const PORT = process.env.PORT || 3002;
 
 app.use(cors());
 app.use(express.json());
+
+// Arquivos enviados pelo painel (banner/mapa dos eventos)
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // API pública (app)
 app.use("/eventos", eventosRouter);
