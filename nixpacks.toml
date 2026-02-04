@@ -6,6 +6,7 @@ nixPkgs = ["nodejs_20"]
 
 [phases.install]
 cmds = ["npm install -g pnpm@10", "pnpm install"]
+# Se o Railway usar só buildCommand, o pnpm já é instalado no início do buildCommand em railway.json
 
 [variables]
 NODE_ENV = "production"
