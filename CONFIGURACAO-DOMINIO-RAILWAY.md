@@ -168,6 +168,25 @@ const distPath = path.resolve(__dirname, "public");
 2. O Railway gera automaticamente certificados Let's Encrypt
 3. Verifique no painel do Railway se o status do domínio está "Active"
 
+### Erro: "ERR_SSL_VERSION_OR_CIPHER_MISMATCH" em https://buscazapbrasil.com.br/secretaria/agenda
+
+**Causa**: O **site institucional** (buscazapbrasil.com.br) é hospedado **fora** do Railway. O erro indica que o servidor ou o proxy (ex.: Cloudflare) que atende esse domínio está usando protocolo TLS ou cifras incompatíveis com o navegador (ex.: TLS 1.0/1.1 descontinuados, ou certificado inativo).
+
+**Onde corrigir**: No provedor do **site buscazapbrasil.com.br** (hospedagem, Cloudflare, etc.), não no projeto PDV.
+
+**Se usar Cloudflare** no domínio buscazapbrasil.com.br:
+1. Acesse o [Cloudflare Dashboard](https://dash.cloudflare.com) → domínio `buscazapbrasil.com.br`.
+2. **SSL/TLS** → **Edge Certificates**: confira se o certificado Universal está **Active**.
+3. **DNS**: para o registro que aponta o site (ex.: `@` ou `www`), deixe **Proxy status = Proxied** (nuvem laranja). Certificados só são usados em tráfego proxied.
+4. **SSL/TLS** → **Overview**: modo recomendado **Full** ou **Full (strict)**; **Minimum TLS Version** = **TLS 1.2** (evite 1.0/1.1).
+
+**Se NÃO usar Cloudflare** (hospedagem própria, cPanel, VPS, etc.):
+1. No servidor web (Apache/Nginx), habilite apenas **TLS 1.2 e 1.3** e cifras modernas.
+2. Renove ou instale um certificado SSL válido (ex.: Let's Encrypt) para `buscazapbrasil.com.br`.
+3. Teste em [SSL Labs](https://www.ssllabs.com/ssltest/analyze.html?d=buscazapbrasil.com.br).
+
+**Alternativa temporária**: Se a área da secretária puder ser servida em outro endereço com HTTPS válido (ex.: subdomínio no Railway), configure `VITE_SITE_URL` no build do cliente para essa URL; o link "Login Secretária" passará a apontar para lá.
+
 ### Erro: 404 Not Found
 
 **Causa**: Arquivos estáticos não estão sendo servidos corretamente.
