@@ -37,6 +37,18 @@ Após publicar o projeto (Vercel, Railway, Netlify, etc.), aponte o domínio des
 - Build: `npm run build` (saída em `dist/`).
 - Deploy: Vercel, Railway (static) ou qualquer host de arquivos estáticos. Configurar `VITE_API_URL` para a URL do eventos-service em produção.
 
+### Evitar 404 em rotas (SPA)
+
+Se ao acessar uma URL como `/eventos` ou `/login` o servidor retornar **404**, é porque o host está procurando um arquivo em vez de servir o app. Ajuste:
+
+- **Vercel**: já está coberto pelo `vercel.json` (rewrite tudo para `/index.html`).
+- **Netlify**: o arquivo `public/_redirects` (copiado para `dist/`) faz `/* → /index.html`.
+- **Railway (static)**: use um servidor com fallback SPA, por exemplo:
+  - Build: `npm run build`
+  - Start: `npx serve -s dist -l 3000`  
+  (ou instale `serve` e use `serve -s dist`).
+- **Outros**: configure "single page application" ou "fallback to index.html" para todas as rotas.
+
 ## Permissões
 
 - **master**: vê todos os eventos, cria evento, edita qualquer evento e expositores.
