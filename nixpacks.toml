@@ -1,12 +1,12 @@
 # Railway/Nixpacks: deploy do BuscaZap-PDV
-# Node 20 + pnpm instalado via npm (evita erro de assinatura do Corepack)
+# "..." = mantém os comandos do provider Node; rodamos antes a instalação do pnpm
 
 [phases.setup]
 nixPkgs = ["nodejs_20"]
 
+# Primeiro instala pnpm globalmente, depois o "..." executa o comando padrão (pnpm install)
 [phases.install]
-cmds = ["npm install -g pnpm@10", "pnpm install"]
-# Se o Railway usar só buildCommand, o pnpm já é instalado no início do buildCommand em railway.json
+cmds = ["npm install -g pnpm@10", "..."]
 
 [variables]
 NODE_ENV = "production"
