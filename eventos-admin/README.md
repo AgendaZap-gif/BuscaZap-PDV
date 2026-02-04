@@ -2,6 +2,14 @@
 
 Painel web para gerenciar eventos/feiras: criar evento, cadastrar expositores, posicionar estandes no mapa, ativar/desativar, gerar QR Code.
 
+## Endereço em produção
+
+**URL recomendada para acessar a configuração da feira:**
+
+- **https://admin.buscazap.com.br** (ou o domínio que você configurar no deploy do `eventos-admin`)
+
+Após publicar o projeto (Vercel, Railway, Netlify, etc.), aponte o domínio desejado (ex.: `admin.buscazap.com.br`) para o deploy. Não há URL fixa no código: o endereço é o que você definir no painel do provedor.
+
 - **Login** → JWT (email/senha na tabela `admins` do eventos-service).
 - **Dashboard** → eventos ativos, total, botão criar evento.
 - **Eventos** → listar, novo, editar, ativar/desativar, gerenciar expositores, abrir mapa.
