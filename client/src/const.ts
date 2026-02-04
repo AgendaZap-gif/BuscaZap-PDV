@@ -9,10 +9,10 @@ export const getLoginUrl = () => {
   return `/api/oauth/login?redirect=${encodeURIComponent(redirectUri)}`;
 };
 
-/** URL do site BuscaZap Brasil (app/site). Usado para abrir a área da secretária no site. Configure VITE_SITE_URL no .env se necessário. */
-export const SITE_BASE_URL =
-  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_SITE_URL) ||
-  "https://www.buscazapbrasil.com.br";
-
-/** Abre a página de login/agenda da secretária no site BuscaZap Brasil (gerencimento pela web). */
-export const getSiteSecretariaUrl = () => `${SITE_BASE_URL}/secretaria/agenda`;
+/** URL base do PDV (mesma origem em produção). Usado para link da secretária; assim /secretaria/agenda é servido pelo próprio PDV e não depende do site www. */
+export const getSiteSecretariaUrl = () => {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/secretaria/agenda`;
+  }
+  return "https://www.buscazapbrasil.com.br/secretaria/agenda";
+};

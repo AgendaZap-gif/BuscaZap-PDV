@@ -33,6 +33,7 @@ function Router() {
     <Switch>
       <Route path={"/"} component={Home} />
       <Route path="/admin/login" component={AdminLogin} />
+      <Route path="/secretaria/agenda" component={AdminLogin} />
       <Route path="/admin/leads">
         <AdminLayout>
           <AdminLeads />
