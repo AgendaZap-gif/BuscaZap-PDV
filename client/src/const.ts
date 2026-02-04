@@ -12,7 +12,7 @@ export const getLoginUrl = () => {
 /** URL do site BuscaZap Brasil (app/site). Usado para abrir a área da secretária no site. Configure VITE_SITE_URL no .env se necessário. */
 export const SITE_BASE_URL =
   (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_SITE_URL) ||
-  "https://buscazapbrasil.com.br";
+  "https://www.buscazapbrasil.com.br";
 
 /** Abre a página de login/agenda da secretária no site BuscaZap Brasil (gerencimento pela web). */
 export const getSiteSecretariaUrl = () => `${SITE_BASE_URL}/secretaria/agenda`;
