@@ -1,0 +1,11 @@
+# Railway/Nixpacks: deploy do BuscaZap-PDV
+# Garante Node 20 e pnpm (corepack) para o build
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "corepack"]
+
+[phases.install]
+cmds = ["corepack enable", "pnpm install"]
+
+[variables]
+NODE_ENV = "production"
