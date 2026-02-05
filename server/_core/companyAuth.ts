@@ -54,7 +54,12 @@ export async function registerCompany(name: string, email: string, password: str
 export async function loginCompany(email: string, password: string): Promise<{ token: string; companyId: number }> {
   const drizzleDb = await db.getDb();
   if (!drizzleDb) throw new Error("Database not available");
-  const rows = await drizzleDb.select().from(companies).where(eq(companies.email, email.toLowerCase().trim())).limit(1);
+  // Seleciona só as colunas necessárias para login (evita 500 se a tabela tiver colunas a mais/menos, ex.: cityId)
+  const rows = await drizzleDb
+    .select({ id: companies.id, email: companies.email, passwordHash: companies.passwordHash })
+    .from(companies)
+    .where(eq(companies.email, email.toLowerCase().trim()))
+    .limit(1);
   if (rows.length === 0) throw new Error("E-mail ou senha inválidos.");
   const company = rows[0];
   if (!company.passwordHash) throw new Error("Login por senha não configurado para esta empresa.");
