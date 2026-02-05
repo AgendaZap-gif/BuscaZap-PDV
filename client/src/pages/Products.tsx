@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageNav } from "@/components/PageNav";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -32,12 +32,21 @@ export default function Products() {
   const [imagePreview, setImagePreview] = useState<string>("");
 
   const utils = trpc.useUtils();
-  
+
+  useEffect(() => {
+    console.log("[Products] Página de gerenciamento de cardápio montada");
+    return () => console.log("[Products] Página desmontada");
+  }, []);
+
   // Queries
-  const { data: products = [], isLoading } = trpc.products.getAll.useQuery({
+  const { data: products = [], isLoading, error: productsError, isError: productsIsError } = trpc.products.getAll.useQuery({
     includeInactive: false,
   });
-  
+
+  useEffect(() => {
+    console.log("[Products] products.getAll:", { isLoading, productsIsError, productsError: productsError?.message, count: products?.length });
+  }, [isLoading, productsIsError, productsError, products?.length]);
+
   const { data: categories = [] } = trpc.categories.getAll.useQuery();
 
   // Mutations

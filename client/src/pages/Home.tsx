@@ -167,9 +167,11 @@ export default function Home() {
               key={mode.path}
               className="cursor-pointer hover:shadow-lg transition-shadow"
               onClick={() => {
+                console.log("[Home] Card clicado:", mode.title, "path:", mode.path);
                 if ((mode as { externalUrl?: string }).externalUrl) {
                   window.open((mode as { externalUrl: string }).externalUrl, "_blank", "noopener,noreferrer");
                 } else {
+                  console.log("[Home] Navegando para:", mode.path);
                   setLocation(mode.path);
                 }
               }}

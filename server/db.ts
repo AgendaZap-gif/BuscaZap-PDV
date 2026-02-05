@@ -2697,49 +2697,65 @@ export async function getCompanyMetricsForDashboard(
       byDate: [],
     };
   }
-  const now = new Date();
-  let start = new Date();
-  if (period === "today") start.setHours(0, 0, 0, 0);
-  else if (period === "week") start.setDate(now.getDate() - 7);
-  else start.setDate(now.getDate() - 30);
-
-  const convs = await db.select().from(conversations).where(and(eq(conversations.companyId, companyId), gte(conversations.createdAt, start)));
-  const msgs = await db.select().from(messages).where(and(eq(messages.companyId, companyId), gte(messages.createdAt, start)));
-  const contacts = await db.select().from(crmContacts).where(and(eq(crmContacts.companyId, companyId), gte(crmContacts.firstContactAt, start)));
-  const hotLeads = contacts.filter((c) => (c.leadScore ?? 0) >= 70).length;
-  const ordersList = await db.select().from(orders).where(and(eq(orders.companyId, companyId), eq(orders.source, "buscazap"), gte(orders.createdAt, start)));
-  const ordersCreated = ordersList.filter((o) => o.status !== "cancelled").length;
-  const conversionRate = convs.length > 0 ? Math.round((ordersCreated / convs.length) * 10000) / 100 : 0;
-
-  const received = msgs.filter((m) => m.role === "customer").length;
-  const sent = msgs.filter((m) => m.role === "assistant" || m.role === "human").length;
-
-  const byDate: Array<{ date: string; conversations: number; orders: number }> = [];
-  const dayMap: Record<string, { conversations: number; orders: number }> = {};
-  for (const c of convs) {
-    const d = new Date(c.createdAt).toISOString().slice(0, 10);
-    if (!dayMap[d]) dayMap[d] = { conversations: 0, orders: 0 };
-    dayMap[d].conversations++;
-  }
-  for (const o of ordersList) {
-    if (o.status === "cancelled") continue;
-    const d = new Date(o.createdAt).toISOString().slice(0, 10);
-    if (!dayMap[d]) dayMap[d] = { conversations: 0, orders: 0 };
-    dayMap[d].orders++;
-  }
-  for (const [date, v] of Object.entries(dayMap)) byDate.push({ date, ...v });
-  byDate.sort((a, b) => a.date.localeCompare(b.date));
-
-  return {
-    conversationsStarted: convs.length,
-    messagesReceived: received,
-    messagesSent: sent,
-    newLeads: contacts.length,
-    hotLeads,
-    ordersCreated,
-    conversionRate,
-    byDate,
+  const empty = {
+    conversationsStarted: 0,
+    messagesReceived: 0,
+    messagesSent: 0,
+    newLeads: 0,
+    hotLeads: 0,
+    ordersCreated: 0,
+    conversionRate: 0,
+    byDate: [] as Array<{ date: string; conversations: number; orders: number }>,
   };
+
+  try {
+    const now = new Date();
+    let start = new Date();
+    if (period === "today") start.setHours(0, 0, 0, 0);
+    else if (period === "week") start.setDate(now.getDate() - 7);
+    else start.setDate(now.getDate() - 30);
+
+    const convs = await db.select().from(conversations).where(and(eq(conversations.companyId, companyId), gte(conversations.createdAt, start)));
+    const msgs = await db.select().from(messages).where(and(eq(messages.companyId, companyId), gte(messages.createdAt, start)));
+    const contacts = await db.select().from(crmContacts).where(and(eq(crmContacts.companyId, companyId), gte(crmContacts.firstContactAt, start)));
+    const hotLeads = contacts.filter((c) => (c.leadScore ?? 0) >= 70).length;
+    const ordersList = await db.select().from(orders).where(and(eq(orders.companyId, companyId), eq(orders.source, "buscazap"), gte(orders.createdAt, start)));
+    const ordersCreated = ordersList.filter((o) => o.status !== "cancelled").length;
+    const conversionRate = convs.length > 0 ? Math.round((ordersCreated / convs.length) * 10000) / 100 : 0;
+
+    const received = msgs.filter((m) => m.role === "customer").length;
+    const sent = msgs.filter((m) => m.role === "assistant" || m.role === "human").length;
+
+    const byDate: Array<{ date: string; conversations: number; orders: number }> = [];
+    const dayMap: Record<string, { conversations: number; orders: number }> = {};
+    for (const c of convs) {
+      const d = new Date(c.createdAt).toISOString().slice(0, 10);
+      if (!dayMap[d]) dayMap[d] = { conversations: 0, orders: 0 };
+      dayMap[d].conversations++;
+    }
+    for (const o of ordersList) {
+      if (o.status === "cancelled") continue;
+      const d = new Date(o.createdAt).toISOString().slice(0, 10);
+      if (!dayMap[d]) dayMap[d] = { conversations: 0, orders: 0 };
+      dayMap[d].orders++;
+    }
+    for (const [date, v] of Object.entries(dayMap)) byDate.push({ date, ...v });
+    byDate.sort((a, b) => a.date.localeCompare(b.date));
+
+    return {
+      conversationsStarted: convs.length,
+      messagesReceived: received,
+      messagesSent: sent,
+      newLeads: contacts.length,
+      hotLeads,
+      ordersCreated,
+      conversionRate,
+      byDate,
+    };
+  } catch (err) {
+    console.error("[getCompanyMetricsForDashboard] Erro ao buscar métricas (tabelas conversations/messages/crm_contacts podem não existir):", err);
+    return empty;
+  }
 }
 
 /** Telefones de clientes ativos (últimos 90 dias) para promoções em massa. */
