@@ -260,12 +260,12 @@ export default function SecretaryPatients() {
             </div>
             <div>
               <Label>Plano de saúde</Label>
-              <Select value={String(form.healthPlanId)} onValueChange={(v) => setForm((f) => ({ ...f, healthPlanId: v || "" }))}>
+              <Select value={form.healthPlanId ? String(form.healthPlanId) : "none"} onValueChange={(v) => setForm((f) => ({ ...f, healthPlanId: v === "none" ? "" : v }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Particular" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Particular</SelectItem>
+                  <SelectItem value="none">Particular</SelectItem>
                   {healthPlans.map((h) => (
                     <SelectItem key={h.id} value={String(h.id)}>{h.name}</SelectItem>
                   ))}

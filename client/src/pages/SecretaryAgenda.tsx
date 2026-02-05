@@ -307,12 +307,12 @@ export default function SecretaryAgenda() {
             </div>
             <div>
               <label className="text-sm font-medium">Plano</label>
-              <Select value={createPlanId} onValueChange={setCreatePlanId}>
+              <Select value={createPlanId || "none"} onValueChange={(v) => setCreatePlanId(v === "none" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Particular ou plano" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Particular</SelectItem>
+                  <SelectItem value="none">Particular</SelectItem>
                   {healthPlans.map((p) => (
                     <SelectItem key={p.id} value={String(p.id)}>
                       {p.name}

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Settings } from "lucide-react";
+import { Settings, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const DAYS = [
@@ -19,10 +19,12 @@ const DAYS = [
   { value: 6, label: "Sábado" },
 ];
 
+type Slot = { dayOfWeek: number; startTime: string; endTime: string; slotMinutes: number; id?: string };
+
 export default function SecretarySettings() {
   const [, setLocation] = useLocation();
   const auth = getCompanyAuth();
-  const [slots, setSlots] = useState<Array<{ dayOfWeek: number; startTime: string; endTime: string; slotMinutes: number }>>([]);
+  const [slots, setSlots] = useState<Slot[]>([]);
 
   useEffect(() => {
     if (!auth) setLocation("/secretaria/agenda");
@@ -43,47 +45,70 @@ export default function SecretarySettings() {
 
   useEffect(() => {
     if (availability.length > 0) {
+      // Agrupar por dia da semana e criar IDs únicos
       setSlots(
-        availability.map((a) => ({
+        availability.map((a, idx) => ({
           dayOfWeek: a.dayOfWeek,
           startTime: a.startTime,
           endTime: a.endTime,
           slotMinutes: a.slotMinutes ?? 30,
+          id: `${a.dayOfWeek}-${idx}`,
         }))
       );
     } else {
+      // Inicializar com um turno por dia
       setSlots(
         DAYS.map((d) => ({
           dayOfWeek: d.value,
           startTime: "08:00",
           endTime: "18:00",
           slotMinutes: 30,
+          id: `${d.value}-0`,
         }))
       );
     }
   }, [availability]);
 
-  const updateSlot = (dayOfWeek: number, field: "startTime" | "endTime" | "slotMinutes", value: string | number) => {
-    setSlots((prev) => {
-      const idx = prev.findIndex((s) => s.dayOfWeek === dayOfWeek);
-      const next = [...prev];
-      if (idx >= 0) {
-        next[idx] = { ...next[idx], [field]: value };
-      } else {
-        next.push({
-          dayOfWeek,
-          startTime: "08:00",
-          endTime: "18:00",
-          slotMinutes: 30,
-          [field]: value,
-        } as (typeof next)[0]);
-      }
-      return next.sort((a, b) => a.dayOfWeek - b.dayOfWeek);
-    });
+  const getSlotsForDay = (dayOfWeek: number) => {
+    return slots.filter((s) => s.dayOfWeek === dayOfWeek).sort((a, b) => a.startTime.localeCompare(b.startTime));
+  };
+
+  const addSlot = (dayOfWeek: number) => {
+    const daySlots = getSlotsForDay(dayOfWeek);
+    const lastSlot = daySlots[daySlots.length - 1];
+    const newStartTime = lastSlot ? lastSlot.endTime : "14:00";
+    const newEndTime = lastSlot && lastSlot.endTime < "18:00" ? "18:00" : "22:00";
+    
+    const newSlot: Slot = {
+      dayOfWeek,
+      startTime: newStartTime,
+      endTime: newEndTime,
+      slotMinutes: 30,
+      id: `${dayOfWeek}-${Date.now()}`,
+    };
+    setSlots((prev) => [...prev, newSlot].sort((a, b) => {
+      if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
+      return a.startTime.localeCompare(b.startTime);
+    }));
+  };
+
+  const removeSlot = (id: string) => {
+    setSlots((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const updateSlot = (id: string, field: "startTime" | "endTime" | "slotMinutes", value: string | number) => {
+    setSlots((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)).sort((a, b) => {
+        if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
+        return a.startTime.localeCompare(b.startTime);
+      })
+    );
   };
 
   const handleSave = () => {
-    const toSave = slots.filter((s) => s.startTime && s.endTime);
+    const toSave = slots
+      .filter((s) => s.startTime && s.endTime)
+      .map(({ id, ...rest }) => rest);
     setAvailability.mutate({ companyId, slots: toSave });
   };
 
@@ -100,49 +125,77 @@ export default function SecretarySettings() {
             Dias e horários para consulta
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Defina em quais dias e horários há vagas para agendamento. O tempo de cada consulta pode ser definido por plano em Planos de saúde.
+            Defina em quais dias e horários há vagas para agendamento. Você pode adicionar múltiplos turnos por dia (ex: manhã e tarde, excluindo horário de almoço). O tempo de cada consulta pode ser definido por plano em Planos de saúde.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {DAYS.map((d) => {
-            const slot = slots.find((s) => s.dayOfWeek === d.value) ?? {
-              dayOfWeek: d.value,
-              startTime: "08:00",
-              endTime: "18:00",
-              slotMinutes: 30,
-            };
+            const daySlots = getSlotsForDay(d.value);
             return (
-              <div key={d.value} className="flex items-center gap-4 flex-wrap border rounded-lg p-3">
-                <span className="w-24 font-medium">{d.label}</span>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs">Das</Label>
-                  <Input
-                    type="time"
-                    value={slot.startTime}
-                    onChange={(e) => updateSlot(d.value, "startTime", e.target.value)}
-                    className="w-28"
-                  />
+              <div key={d.value} className="border rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{d.label}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addSlot(d.value)}
+                    className="h-8"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Adicionar turno
+                  </Button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs">às</Label>
-                  <Input
-                    type="time"
-                    value={slot.endTime}
-                    onChange={(e) => updateSlot(d.value, "endTime", e.target.value)}
-                    className="w-28"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs">Slot (min)</Label>
-                  <Input
-                    type="number"
-                    min={10}
-                    max={120}
-                    value={slot.slotMinutes}
-                    onChange={(e) => updateSlot(d.value, "slotMinutes", parseInt(e.target.value, 10) || 30)}
-                    className="w-20"
-                  />
-                </div>
+                {daySlots.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">Nenhum horário configurado para este dia</p>
+                ) : (
+                  <div className="space-y-2">
+                    {daySlots.map((slot) => (
+                      <div key={slot.id} className="flex items-center gap-4 flex-wrap bg-muted/30 rounded p-2">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs">Das</Label>
+                          <Input
+                            type="time"
+                            value={slot.startTime}
+                            onChange={(e) => updateSlot(slot.id!, "startTime", e.target.value)}
+                            className="w-28"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs">às</Label>
+                          <Input
+                            type="time"
+                            value={slot.endTime}
+                            onChange={(e) => updateSlot(slot.id!, "endTime", e.target.value)}
+                            className="w-28"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs">Slot (min)</Label>
+                          <Input
+                            type="number"
+                            min={10}
+                            max={120}
+                            value={slot.slotMinutes}
+                            onChange={(e) => updateSlot(slot.id!, "slotMinutes", parseInt(e.target.value, 10) || 30)}
+                            className="w-20"
+                          />
+                        </div>
+                        {daySlots.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeSlot(slot.id!)}
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
