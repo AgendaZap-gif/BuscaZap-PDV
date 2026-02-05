@@ -5,6 +5,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, companyProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
+import * as agendaDb from "./agendaDb";
 import { buildCompanyPrompt, companyToBrainData, parseDataBlock, type DataBlock } from "./_core/buscazapBrain";
 import { geminiChat, toGeminiMessages, isGeminiConfigured } from "./_core/gemini";
 
@@ -283,6 +284,182 @@ export const appRouter = router({
           });
         }
         return { sent: phones.length };
+      }),
+  }),
+
+  // ==================== AGENDA (Secretária - clínicas, hospitais, comércios) ====================
+  agenda: router({
+    healthPlans: router({
+      list: companyProcedure
+        .input(z.object({ companyId: z.number() }))
+        .query(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          return agendaDb.getAgendaHealthPlans(input.companyId);
+        }),
+      create: companyProcedure
+        .input(z.object({ companyId: z.number(), name: z.string(), slug: z.string(), color: z.string().optional(), defaultDurationMinutes: z.number().optional() }))
+        .mutation(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          return agendaDb.createAgendaHealthPlan(input.companyId, input);
+        }),
+      update: companyProcedure
+        .input(z.object({ companyId: z.number(), id: z.number(), name: z.string().optional(), slug: z.string().optional(), color: z.string().optional(), isActive: z.boolean().optional(), defaultDurationMinutes: z.number().optional() }))
+        .mutation(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          const { id, companyId, ...data } = input;
+          await agendaDb.updateAgendaHealthPlan(id, companyId, data);
+        }),
+      delete: companyProcedure
+        .input(z.object({ companyId: z.number(), id: z.number() }))
+        .mutation(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          await agendaDb.deleteAgendaHealthPlan(input.id, input.companyId);
+        }),
+    }),
+    patients: router({
+      list: companyProcedure
+        .input(z.object({ companyId: z.number(), search: z.string().optional() }))
+        .query(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          return agendaDb.getAgendaPatients(input.companyId, input.search);
+        }),
+      get: companyProcedure
+        .input(z.object({ companyId: z.number(), id: z.number() }))
+        .query(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          return agendaDb.getAgendaPatientById(input.id, input.companyId);
+        }),
+      getByPhone: companyProcedure
+        .input(z.object({ companyId: z.number(), phone: z.string() }))
+        .query(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          return agendaDb.getAgendaPatientByPhone(input.companyId, input.phone);
+        }),
+      create: companyProcedure
+        .input(z.object({
+          companyId: z.number(),
+          name: z.string(),
+          phone: z.string(),
+          email: z.string().optional(),
+          document: z.string().optional(),
+          birthDate: z.string().optional(),
+          healthPlanId: z.number().nullable().optional(),
+          address: z.string().optional(),
+          notes: z.string().optional(),
+        }))
+        .mutation(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          const { companyId, ...data } = input;
+          return agendaDb.createAgendaPatient(companyId, data);
+        }),
+      update: companyProcedure
+        .input(z.object({
+          companyId: z.number(),
+          id: z.number(),
+          name: z.string().optional(),
+          phone: z.string().optional(),
+          email: z.string().optional(),
+          document: z.string().optional(),
+          birthDate: z.string().optional(),
+          healthPlanId: z.number().nullable().optional(),
+          address: z.string().optional(),
+          notes: z.string().optional(),
+        }))
+        .mutation(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          const { id, companyId, ...data } = input;
+          await agendaDb.updateAgendaPatient(id, companyId, data);
+        }),
+      delete: companyProcedure
+        .input(z.object({ companyId: z.number(), id: z.number() }))
+        .mutation(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          await agendaDb.deleteAgendaPatient(input.id, input.companyId);
+        }),
+    }),
+    availability: router({
+      list: companyProcedure
+        .input(z.object({ companyId: z.number() }))
+        .query(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          return agendaDb.getAgendaAvailability(input.companyId);
+        }),
+      set: companyProcedure
+        .input(z.object({
+          companyId: z.number(),
+          slots: z.array(z.object({ dayOfWeek: z.number(), startTime: z.string(), endTime: z.string(), slotMinutes: z.number().optional() })),
+        }))
+        .mutation(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          await agendaDb.setAgendaAvailability(input.companyId, input.slots);
+        }),
+    }),
+    quotas: router({
+      list: companyProcedure
+        .input(z.object({ companyId: z.number() }))
+        .query(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          return agendaDb.getAgendaQuotas(input.companyId);
+        }),
+      set: companyProcedure
+        .input(z.object({ companyId: z.number(), healthPlanId: z.number(), period: z.enum(["week", "month"]), maxSlots: z.number() }))
+        .mutation(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          await agendaDb.setAgendaQuota(input.companyId, input.healthPlanId, input.period, input.maxSlots);
+        }),
+    }),
+    appointments: router({
+      list: companyProcedure
+        .input(z.object({ companyId: z.number(), start: z.date(), end: z.date() }))
+        .query(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          return agendaDb.getAgendaAppointmentsInRange(input.companyId, input.start, input.end);
+        }),
+      get: companyProcedure
+        .input(z.object({ companyId: z.number(), id: z.number() }))
+        .query(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          return agendaDb.getAgendaAppointmentById(input.id, input.companyId);
+        }),
+      create: companyProcedure
+        .input(z.object({
+          companyId: z.number(),
+          patientId: z.number(),
+          healthPlanId: z.number().nullable().optional(),
+          startAt: z.date(),
+          endAt: z.date(),
+          durationMinutes: z.number().optional(),
+          notes: z.string().optional(),
+        }))
+        .mutation(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          const check = await agendaDb.checkAgendaQuotaBeforeBook(input.companyId, input.healthPlanId ?? null, input.startAt);
+          if (!check.allowed) throw new TRPCError({ code: "BAD_REQUEST", message: check.reason });
+          return agendaDb.createAgendaAppointment(input.companyId, input);
+        }),
+      updateStatus: companyProcedure
+        .input(z.object({ companyId: z.number(), id: z.number(), status: z.enum(["scheduled", "confirmed", "cancelled", "completed", "no_show"]) }))
+        .mutation(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          await agendaDb.updateAgendaAppointmentStatus(input.id, input.companyId, input.status, input.status === "confirmed" ? new Date() : undefined);
+        }),
+      sendConfirmation: companyProcedure
+        .input(z.object({ companyId: z.number(), id: z.number(), baseUrl: z.string() }))
+        .mutation(async ({ input, ctx }) => {
+          if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN" });
+          const app = await agendaDb.getAgendaAppointmentById(input.id, input.companyId);
+          if (!app?.patient) throw new TRPCError({ code: "NOT_FOUND", message: "Agendamento ou paciente não encontrado." });
+          const { sendAppointmentConfirmation } = await import("./_core/salebotAgenda.js");
+          const msg = `Confirmação: você tem consulta agendada para ${new Date(app.startAt).toLocaleString("pt-BR")}.`;
+          const result = await sendAppointmentConfirmation(input.id, input.companyId, app.patient.phone, msg, input.baseUrl);
+          if (!result.success) throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
+          return { sent: true };
+        }),
+    }),
+    getAvailableSlots: publicProcedure
+      .input(z.object({ companyId: z.number(), date: z.date(), healthPlanId: z.number().nullable().optional(), durationMinutes: z.number().optional() }))
+      .query(async ({ input }) => {
+        return agendaDb.getAgendaAvailableSlots(input.companyId, input.date, input.healthPlanId ?? null, input.durationMinutes ?? 30);
       }),
   }),
 

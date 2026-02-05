@@ -7,6 +7,11 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Tables from "./pages/Tables";
 import AdminLogin from "./pages/AdminLogin";
+import SecretaryLayout from "./pages/SecretaryLayout";
+import SecretaryAgenda from "./pages/SecretaryAgenda";
+import SecretaryPatients from "./pages/SecretaryPatients";
+import SecretaryPlans from "./pages/SecretaryPlans";
+import SecretarySettings from "./pages/SecretarySettings";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLeads from "./pages/AdminLeads";
 import AdminTraining from "./pages/AdminTraining";
@@ -34,6 +39,26 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/secretaria/agenda" component={AdminLogin} />
+      <Route path="/secretaria/agenda/painel">
+        <SecretaryLayout>
+          <SecretaryAgenda />
+        </SecretaryLayout>
+      </Route>
+      <Route path="/secretaria/agenda/pacientes">
+        <SecretaryLayout>
+          <SecretaryPatients />
+        </SecretaryLayout>
+      </Route>
+      <Route path="/secretaria/agenda/planos">
+        <SecretaryLayout>
+          <SecretaryPlans />
+        </SecretaryLayout>
+      </Route>
+      <Route path="/secretaria/agenda/config">
+        <SecretaryLayout>
+          <SecretarySettings />
+        </SecretaryLayout>
+      </Route>
       <Route path="/admin/leads">
         <AdminLayout>
           <AdminLeads />

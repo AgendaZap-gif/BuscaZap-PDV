@@ -8,10 +8,23 @@ import { useToast } from "@/hooks/use-toast";
 
 const COMPANY_TOKEN_KEY = "buscazap_company_token";
 const COMPANY_ID_KEY = "buscazap_company_id";
+/** Usado para logout: secretária volta para /secretaria/agenda, admin para /admin/login */
+const AUTH_ORIGIN_KEY = "buscazap_auth_origin";
 
-export function setCompanyAuth(token: string, companyId: number) {
+export function setCompanyAuth(token: string, companyId: number, origin?: "secretaria" | "admin") {
   localStorage.setItem(COMPANY_TOKEN_KEY, token);
   localStorage.setItem(COMPANY_ID_KEY, String(companyId));
+  if (origin) localStorage.setItem(AUTH_ORIGIN_KEY, origin);
+}
+
+export function getAuthOrigin(): "secretaria" | "admin" | null {
+  const o = localStorage.getItem(AUTH_ORIGIN_KEY);
+  if (o === "secretaria" || o === "admin") return o;
+  return null;
+}
+
+export function clearAuthOrigin() {
+  localStorage.removeItem(AUTH_ORIGIN_KEY);
 }
 
 export function getCompanyAuth(): { token: string; companyId: number } | null {
@@ -24,30 +37,45 @@ export function getCompanyAuth(): { token: string; companyId: number } | null {
 export function clearCompanyAuth() {
   localStorage.removeItem(COMPANY_TOKEN_KEY);
   localStorage.removeItem(COMPANY_ID_KEY);
+  localStorage.removeItem(AUTH_ORIGIN_KEY);
 }
 
 export default function AdminLogin() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState("");
 
+  const isSecretariaAgenda = location === "/secretaria/agenda";
+
   const loginMutation = trpc.companyAuth.login.useMutation({
     onSuccess: (data) => {
-      setCompanyAuth(data.token, data.companyId);
-      toast({ title: "Entrou!", description: "Redirecionando ao painel." });
-      setLocation("/admin");
+      if (isSecretariaAgenda) {
+        setCompanyAuth(data.token, data.companyId, "secretaria");
+        toast({ title: "Entrou!", description: "Redirecionando à agenda." });
+        setLocation("/secretaria/agenda/painel");
+      } else {
+        setCompanyAuth(data.token, data.companyId, "admin");
+        toast({ title: "Entrou!", description: "Redirecionando ao painel." });
+        setLocation("/admin");
+      }
     },
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
   const registerMutation = trpc.companyAuth.register.useMutation({
     onSuccess: (data) => {
-      setCompanyAuth(data.token, data.companyId);
-      toast({ title: "Conta criada!", description: "Redirecionando ao painel." });
-      setLocation("/admin");
+      if (isSecretariaAgenda) {
+        setCompanyAuth(data.token, data.companyId, "secretaria");
+        toast({ title: "Conta criada!", description: "Redirecionando à agenda." });
+        setLocation("/secretaria/agenda/painel");
+      } else {
+        setCompanyAuth(data.token, data.companyId, "admin");
+        toast({ title: "Conta criada!", description: "Redirecionando ao painel." });
+        setLocation("/admin");
+      }
     },
     onError: (e) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
@@ -69,9 +97,15 @@ export default function AdminLogin() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>BuscaZap IA — Painel</CardTitle>
+          <CardTitle>
+            {isSecretariaAgenda ? "Secretária — Agenda" : "BuscaZap IA — Painel"}
+          </CardTitle>
           <p className="text-sm text-muted-foreground">
-            {isRegister ? "Criar conta da empresa" : "Entrar com e-mail e senha"}
+            {isSecretariaAgenda
+              ? "Gerenciamento de agendamento de horários (clínicas, hospitais, comércios)"
+              : isRegister
+                ? "Criar conta da empresa"
+                : "Entrar com e-mail e senha"}
           </p>
         </CardHeader>
         <CardContent>

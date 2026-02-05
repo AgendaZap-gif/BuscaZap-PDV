@@ -787,3 +787,89 @@ export const notificationQueue = mysqlTable("notification_queue", {
 
 export type NotificationQueue = typeof notificationQueue.$inferSelect;
 export type InsertNotificationQueue = typeof notificationQueue.$inferInsert;
+
+// ==================== AGENDA (Secretária - clínicas, hospitais, comércios) ====================
+
+/** Planos de saúde / particular por empresa */
+export const agendaHealthPlans = mysqlTable("agenda_health_plans", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  slug: varchar("slug", { length: 60 }).notNull(),
+  color: varchar("color", { length: 7 }).default("#3B82F6").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  defaultDurationMinutes: int("defaultDurationMinutes").default(30).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AgendaHealthPlan = typeof agendaHealthPlans.$inferSelect;
+export type InsertAgendaHealthPlan = typeof agendaHealthPlans.$inferInsert;
+
+/** Pacientes cadastrados pela empresa */
+export const agendaPatients = mysqlTable("agenda_patients", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  document: varchar("document", { length: 20 }),
+  birthDate: varchar("birthDate", { length: 10 }),
+  healthPlanId: int("healthPlanId"),
+  address: text("address"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AgendaPatient = typeof agendaPatients.$inferSelect;
+export type InsertAgendaPatient = typeof agendaPatients.$inferInsert;
+
+/** Dias e horários disponíveis para consulta (por dia da semana) */
+export const agendaAvailability = mysqlTable("agenda_availability", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  dayOfWeek: int("dayOfWeek").notNull(),
+  startTime: varchar("startTime", { length: 5 }).notNull(),
+  endTime: varchar("endTime", { length: 5 }).notNull(),
+  slotMinutes: int("slotMinutes").default(30).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AgendaAvailability = typeof agendaAvailability.$inferSelect;
+export type InsertAgendaAvailability = typeof agendaAvailability.$inferInsert;
+
+/** Vagas por plano por período (ex: Unimed 1/semana, particular ilimitado) */
+export const agendaQuotas = mysqlTable("agenda_quotas", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  healthPlanId: int("healthPlanId").notNull(),
+  period: mysqlEnum("period", ["week", "month"]).notNull(),
+  maxSlots: int("maxSlots").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AgendaQuota = typeof agendaQuotas.$inferSelect;
+export type InsertAgendaQuota = typeof agendaQuotas.$inferInsert;
+
+/** Agendamentos */
+export const agendaAppointments = mysqlTable("agenda_appointments", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  patientId: int("patientId").notNull(),
+  healthPlanId: int("healthPlanId"),
+  startAt: timestamp("startAt").notNull(),
+  endAt: timestamp("endAt").notNull(),
+  durationMinutes: int("durationMinutes").default(30).notNull(),
+  status: mysqlEnum("status", ["scheduled", "confirmed", "cancelled", "completed", "no_show"]).default("scheduled").notNull(),
+  confirmedAt: timestamp("confirmedAt"),
+  salebotPendingId: varchar("salebotPendingId", { length: 64 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AgendaAppointment = typeof agendaAppointments.$inferSelect;
+export type InsertAgendaAppointment = typeof agendaAppointments.$inferInsert;

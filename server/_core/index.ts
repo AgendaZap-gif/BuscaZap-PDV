@@ -36,6 +36,7 @@ async function startServer() {
   const server = createServer(app);
   app.use(detectCompanyByDomain);
   registerStripeWebhook(app);
+  registerAgendaWebhook(app);
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerGoogleOAuthRoutes(app);
@@ -70,6 +71,19 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+  });
+}
+
+function registerAgendaWebhook(app: express.Express) {
+  app.post("/api/agenda/confirmation-webhook", express.json(), async (req: express.Request, res: express.Response) => {
+    try {
+      const { handleConfirmationWebhook } = await import("./salebotAgenda.js");
+      const result = await handleConfirmationWebhook(req.body || {});
+      res.status(200).json(result);
+    } catch (e) {
+      console.warn("[Agenda] Confirmation webhook error:", e);
+      res.status(500).json({ ok: false });
+    }
   });
 }
 

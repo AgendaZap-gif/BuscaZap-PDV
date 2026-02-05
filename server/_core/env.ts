@@ -24,4 +24,7 @@ export const ENV = {
   stripePricePremium: process.env.STRIPE_PRICE_PREMIUM ?? "",
   // JWT para auth empresa (painel BuscaZap IA)
   companyJwtSecret: process.env.JWT_SECRET ?? process.env.COMPANY_JWT_SECRET ?? "buscazap-company-secret",
+  // SaleBot (confirmação de agendamento por WhatsApp)
+  salebotApiUrl: process.env.SALEBOT_API_URL ?? "",
+  agendaWebhookSecret: process.env.AGENDA_WEBHOOK_SECRET ?? "",
 };
