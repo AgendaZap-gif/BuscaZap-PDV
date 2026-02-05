@@ -39,10 +39,9 @@ export const updateEvento = (id, data) => api.put(`/admin/eventos/${id}`, data).
 export const uploadEventoImage = (file, tipo = "banner") => {
   const formData = new FormData();
   formData.append("file", file);
+  // Não definir Content-Type: o axios detecta FormData e deixa o navegador definir multipart/form-data com boundary.
   return api
-    .post(`/admin/eventos/upload?tipo=${encodeURIComponent(tipo)}`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    })
+    .post(`/admin/eventos/upload?tipo=${encodeURIComponent(tipo)}`, formData)
     .then((r) => r.data);
 };
 export const toggleAtivoEvento = (id, ativo) =>
