@@ -10,6 +10,8 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("eventos_admin_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Para FormData, não definir Content-Type: o navegador define multipart/form-data com boundary
+  if (config.data instanceof FormData) delete config.headers["Content-Type"];
   return config;
 });
 
@@ -39,7 +41,7 @@ export const updateEvento = (id, data) => api.put(`/admin/eventos/${id}`, data).
 export const uploadEventoImage = (file, tipo = "banner") => {
   const formData = new FormData();
   formData.append("file", file);
-  // Não definir Content-Type: o axios detecta FormData e deixa o navegador definir multipart/form-data com boundary.
+  // Remover Content-Type para o navegador definir multipart/form-data com boundary (evita 400 no servidor).
   return api
     .post(`/admin/eventos/upload?tipo=${encodeURIComponent(tipo)}`, formData)
     .then((r) => r.data);
