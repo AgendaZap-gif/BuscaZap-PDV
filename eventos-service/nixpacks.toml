@@ -1,0 +1,14 @@
+# Deploy do eventos-service no Railway
+# Use Root Directory = "eventos-service" no serviço Railway
+
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = []
+
+[variables]
+NODE_ENV = "production"
