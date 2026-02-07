@@ -3,8 +3,8 @@ import pool from "../db.js";
 
 const router = Router();
 
-// GET /eventos/ativos?cidade=Primavera do Leste
-// Somente eventos ativos (ativo=true, hoje entre data_inicio e data_fim), filtrados por cidade
+// GET /eventos/ativos?cidade=...
+// Eventos ativos na cidade: durante o evento ou até 30 dias após data_fim (continuidade).
 router.get("/ativos", async (req, res) => {
   try {
     const cidade = req.query.cidade?.trim();
@@ -16,7 +16,8 @@ router.get("/ativos", async (req, res) => {
        FROM eventos
        WHERE cidade = ?
          AND ativo = true
-         AND CURDATE() BETWEEN data_inicio AND data_fim
+         AND CURDATE() >= data_inicio
+         AND CURDATE() <= DATE_ADD(data_fim, INTERVAL 30 DAY)
        ORDER BY data_inicio ASC`,
       [cidade]
     );
