@@ -17,6 +17,7 @@ export default function EventoForm() {
     cidade: "",
     dataInicio: "",
     dataFim: "",
+    exibirAPartir: "", // opcional: data a partir da qual exibir no app (divulgação antecipada)
     bannerUrl: "",
     mapaUrl: "",
     mapaLargura: 800,
@@ -36,6 +37,7 @@ export default function EventoForm() {
           cidade: e.cidade || "",
           dataInicio: e.dataInicio?.slice(0, 10) || "",
           dataFim: e.dataFim?.slice(0, 10) || "",
+          exibirAPartir: e.exibirAPartir ? String(e.exibirAPartir).slice(0, 10) : "",
           bannerUrl: e.bannerUrl || "",
           mapaUrl: e.mapaUrl || "",
           mapaLargura: e.mapaLargura ?? 800,
@@ -132,6 +134,18 @@ export default function EventoForm() {
                 required
               />
             </div>
+          </div>
+          <div className="form-group">
+            <label>Exibir no app a partir de</label>
+            <input
+              type="date"
+              value={form.exibirAPartir}
+              onChange={(e) => handleChange("exibirAPartir", e.target.value)}
+              placeholder="Opcional"
+            />
+            <p style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "0.35rem", marginBottom: 0 }}>
+              Opcional. Preencha para divulgar a feira no app antes do início (ex.: 7 dias antes). Deixe em branco para exibir só no período do evento.
+            </p>
           </div>
           <div className="form-group">
             <label>Banner</label>
