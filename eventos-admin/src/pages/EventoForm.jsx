@@ -24,6 +24,8 @@ export default function EventoForm() {
     mapaAltura: 600,
     ativo: true,
   });
+  const [anexoBannerId, setAnexoBannerId] = useState(null);
+  const [anexoMapaId, setAnexoMapaId] = useState(null);
 
   useEffect(() => {
     if (!isEdit) {
@@ -62,8 +64,16 @@ export default function EventoForm() {
     const setUploading = field === "bannerUrl" ? setUploadingBanner : setUploadingMapa;
     setUploading(true);
     try {
-      const { url } = await uploadEventoImage(file, tipo);
-      setForm((prev) => ({ ...prev, [field]: url }));
+      const eventoId = isEdit ? id : null;
+      const data = await uploadEventoImage(file, tipo, eventoId);
+      setForm((prev) => ({ ...prev, [field]: data.url }));
+      if (data.anexoId) {
+        if (field === "bannerUrl") setAnexoBannerId(data.anexoId);
+        else setAnexoMapaId(data.anexoId);
+      } else {
+        if (field === "bannerUrl") setAnexoBannerId(null);
+        else setAnexoMapaId(null);
+      }
     } catch (err) {
       alert(err.response?.data?.error || "Erro ao enviar imagem.");
     } finally {
@@ -79,7 +89,10 @@ export default function EventoForm() {
         await updateEvento(id, form);
         alert("Evento atualizado.");
       } else {
-        await createEvento(form);
+        const payload = { ...form };
+        if (anexoBannerId) payload.anexoBannerId = anexoBannerId;
+        if (anexoMapaId) payload.anexoMapaId = anexoMapaId;
+        await createEvento(payload);
         alert("Evento criado.");
       }
       navigate("/eventos");

@@ -37,13 +37,16 @@ export const getEvento = (id) => api.get(`/admin/eventos/${id}`).then((r) => r.d
 export const createEvento = (data) => api.post("/admin/eventos", data).then((r) => r.data);
 export const updateEvento = (id, data) => api.put(`/admin/eventos/${id}`, data).then((r) => r.data);
 
-/** Upload de imagem (banner ou mapa). file = File; tipo = "banner" | "mapa". Retorna { url } */
-export const uploadEventoImage = (file, tipo = "banner") => {
+/** Upload de imagem (banner ou mapa). Salva no banco (persiste após deploy).
+ *  file = File; tipo = "banner" | "mapa"; eventoId = opcional (obrigatório na edição para persistir).
+ *  Retorna { url } ou { url, anexoId } quando evento ainda não existe (usar anexoId no create). */
+export const uploadEventoImage = (file, tipo = "banner", eventoId = null) => {
   const formData = new FormData();
   formData.append("file", file);
-  // Remover Content-Type para o navegador definir multipart/form-data com boundary (evita 400 no servidor).
+  let q = `tipo=${encodeURIComponent(tipo)}`;
+  if (eventoId != null) q += `&eventoId=${encodeURIComponent(eventoId)}`;
   return api
-    .post(`/admin/eventos/upload?tipo=${encodeURIComponent(tipo)}`, formData)
+    .post(`/admin/eventos/upload?${q}`, formData)
     .then((r) => r.data);
 };
 export const toggleAtivoEvento = (id, ativo) =>
