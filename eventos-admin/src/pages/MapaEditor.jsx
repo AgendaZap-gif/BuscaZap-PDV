@@ -9,6 +9,7 @@ export default function MapaEditor() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [imgSize, setImgSize] = useState(null); // { width, height } após imagem carregar — evita pin no lugar errado
   const imgRef = useRef(null);
 
   const load = () => {
@@ -28,8 +29,12 @@ export default function MapaEditor() {
     load();
   }, [id]);
 
+  useEffect(() => {
+    setImgSize(null);
+  }, [evento?.mapaUrl]);
+
   const handleMapClick = (e) => {
-    if (!imgRef.current || !selected) return;
+    if (!imgRef.current || !selected || !imgSize) return;
     const rect = imgRef.current.getBoundingClientRect();
     const x = Math.round((e.clientX - rect.left) * (mapaLargura / rect.width));
     const y = Math.round((e.clientY - rect.top) * (mapaAltura / rect.height));
@@ -116,39 +121,54 @@ export default function MapaEditor() {
             alt="Mapa da feira"
             style={{ display: "block", maxWidth: "100%", height: "auto", cursor: selected ? "crosshair" : "default" }}
             onClick={handleMapClick}
+            onLoad={() => {
+              if (imgRef.current) {
+                const r = imgRef.current.getBoundingClientRect();
+                setImgSize({ width: r.width, height: r.height });
+              }
+            }}
             draggable={false}
           />
-          {expositores
-            .filter((ex) => ex.posX != null && ex.posY != null)
-            .map((ex) => {
-              const rect = imgRef.current?.getBoundingClientRect() ?? { width: mapaLargura, height: mapaAltura };
-              const scaleX = rect.width / mapaLargura;
-              const scaleY = rect.height / mapaAltura;
-              return (
-                <span
-                  key={ex.id}
-                  style={{
-                    position: "absolute",
-                    left: (ex.posX || 0) * scaleX - 10,
-                    top: (ex.posY || 0) * scaleY - 20,
-                    width: 20,
-                    height: 20,
-                    borderRadius: "50%",
-                    background: selected?.id === ex.id ? "#2563eb" : "#16a34a",
-                    border: "2px solid #fff",
-                    pointerEvents: "none",
-                    fontSize: 10,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#fff",
-                    fontWeight: "bold",
-                  }}
-                >
-                  •
-                </span>
-              );
-            })}
+          {imgSize &&
+            expositores
+              .filter((ex) => ex.posX != null && ex.posY != null)
+              .map((ex) => {
+                const scaleX = imgSize.width / mapaLargura;
+                const scaleY = imgSize.height / mapaAltura;
+                const isSelected = selected?.id === ex.id;
+                const isDestaque = Boolean(ex.destaque);
+                const isPatrocinado = Boolean(ex.patrocinado);
+                let pinBg = "#16a34a";
+                if (isSelected) pinBg = "#2563eb";
+                else if (isPatrocinado) pinBg = "#7c3aed";
+                else if (isDestaque) pinBg = "#ea580c";
+                return (
+                  <span
+                    key={ex.id}
+                    title={`${ex.nome}${isDestaque ? " · Destaque" : ""}${isPatrocinado ? " · Patrocinado" : ""}`}
+                    style={{
+                      position: "absolute",
+                      left: (ex.posX || 0) * scaleX - 10,
+                      top: (ex.posY || 0) * scaleY - 10,
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      background: pinBg,
+                      border: isDestaque || isPatrocinado ? "3px solid #fff" : "2px solid #fff",
+                      boxShadow: isPatrocinado ? "0 0 0 2px #7c3aed" : "none",
+                      pointerEvents: "none",
+                      fontSize: 10,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#fff",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    •
+                  </span>
+                );
+              })}
         </div>
       </div>
     </div>
