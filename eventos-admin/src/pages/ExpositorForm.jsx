@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { getEvento, listExpositores, createExpositor, updateExpositor } from "../services/api";
 
 export default function ExpositorForm() {
