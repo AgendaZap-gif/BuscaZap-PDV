@@ -28,9 +28,6 @@ export default function MapaEditor() {
     load();
   }, [id]);
 
-  const mapaLargura = evento.mapaLargura || 800;
-  const mapaAltura = evento.mapaAltura || 600;
-
   const handleMapClick = (e) => {
     if (!imgRef.current || !selected) return;
     const rect = imgRef.current.getBoundingClientRect();
@@ -59,6 +56,10 @@ export default function MapaEditor() {
 
   if (loading) return <div className="container">Carregando...</div>;
   if (!evento) return <div className="container">Evento não encontrado.</div>;
+
+  const mapaLargura = evento.mapaLargura ?? 800;
+  const mapaAltura = evento.mapaAltura ?? 600;
+
   if (!evento.mapaUrl) {
     return (
       <div className="container">
