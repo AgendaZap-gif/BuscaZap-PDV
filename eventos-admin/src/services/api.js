@@ -37,9 +37,8 @@ export const getEvento = (id) => api.get(`/admin/eventos/${id}`).then((r) => r.d
 export const createEvento = (data) => api.post("/admin/eventos", data).then((r) => r.data);
 export const updateEvento = (id, data) => api.put(`/admin/eventos/${id}`, data).then((r) => r.data);
 
-/** Upload de imagem (banner ou mapa). Salva no banco (persiste após deploy).
- *  file = File; tipo = "banner" | "mapa"; eventoId = opcional (obrigatório na edição para persistir).
- *  Retorna { url } ou { url, anexoId } quando evento ainda não existe (usar anexoId no create). */
+/** Upload de imagem (banner ou mapa). tipo = "banner" | "mapa"; eventoId = opcional.
+ *  Para banner com eventoId: adiciona ao carrossel e retorna { url, bannerImageId }. */
 export const uploadEventoImage = (file, tipo = "banner", eventoId = null) => {
   const formData = new FormData();
   formData.append("file", file);
@@ -47,6 +46,23 @@ export const uploadEventoImage = (file, tipo = "banner", eventoId = null) => {
   if (eventoId != null) q += `&eventoId=${encodeURIComponent(eventoId)}`;
   return api
     .post(`/admin/eventos/upload?${q}`, formData)
+    .then((r) => r.data);
+};
+
+/** Listar imagens do carrossel do banner do evento (API: buscazap-eventos-service) */
+export const listBannerImagens = (eventoId) =>
+  api.get(`/admin/eventos/${eventoId}/banner-home`).then((r) => r.data);
+
+/** Excluir uma imagem do carrossel do banner */
+export const deleteBannerImagem = (eventoId, imageId) =>
+  api.delete(`/admin/eventos/${eventoId}/banner-home/${imageId}`);
+
+/** Upload de várias imagens para o carrossel do banner (FormData com múltiplos 'file') */
+export const uploadBannerImagensBulk = (eventoId, files) => {
+  const formData = new FormData();
+  Array.from(files).forEach((file) => formData.append("file", file));
+  return api
+    .post(`/admin/eventos/${eventoId}/banner-home/bulk`, formData)
     .then((r) => r.data);
 };
 export const toggleAtivoEvento = (id, ativo) =>

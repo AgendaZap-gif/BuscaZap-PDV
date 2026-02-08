@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getEvento, createEvento, updateEvento, uploadEventoImage } from "../services/api";
+import {
+  getEvento,
+  createEvento,
+  updateEvento,
+  uploadEventoImage,
+  listBannerImagens,
+  deleteBannerImagem,
+  uploadBannerImagensBulk,
+} from "../services/api";
 import QRCodeExport from "../components/QRCodeExport";
 
 export default function EventoForm() {
@@ -26,6 +34,8 @@ export default function EventoForm() {
   });
   const [anexoBannerId, setAnexoBannerId] = useState(null);
   const [anexoMapaId, setAnexoMapaId] = useState(null);
+  const [bannerImagens, setBannerImagens] = useState([]);
+  const [uploadingBanners, setUploadingBanners] = useState(false);
 
   useEffect(() => {
     if (!isEdit) {
@@ -46,6 +56,7 @@ export default function EventoForm() {
           mapaAltura: e.mapaAltura ?? 600,
           ativo: e.ativo !== false,
         });
+        setBannerImagens(e.bannerImagens || []);
       })
       .catch(() => setForm((f) => f))
       .finally(() => setLoading(false));
@@ -78,6 +89,36 @@ export default function EventoForm() {
       alert(err.response?.data?.error || "Erro ao enviar imagem.");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleBannerImagensUpload = async (files) => {
+    if (!isEdit || !id || !files?.length) return;
+    const imageFiles = Array.from(files).filter((f) => f.type?.startsWith("image/"));
+    if (!imageFiles.length) {
+      alert("Selecione apenas imagens (JPG, PNG, etc.).");
+      return;
+    }
+    setUploadingBanners(true);
+    try {
+      await uploadBannerImagensBulk(id, imageFiles);
+      const list = await listBannerImagens(id);
+      setBannerImagens(list);
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao enviar imagens.");
+    } finally {
+      setUploadingBanners(false);
+    }
+  };
+
+  const handleRemoveBannerImagem = async (imageId) => {
+    if (!isEdit || !id) return;
+    if (!confirm("Remover esta imagem do carrossel?")) return;
+    try {
+      await deleteBannerImagem(id, imageId);
+      setBannerImagens((prev) => prev.filter((img) => img.id !== imageId));
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao remover.");
     }
   };
 
@@ -161,9 +202,9 @@ export default function EventoForm() {
             </p>
           </div>
           <div className="form-group">
-            <label>Banner</label>
+            <label>Banner (principal)</label>
             <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.5rem" }}>
-              Use o link (URL) ou envie uma imagem. Se enviar arquivo, o sistema salva e gera o link automaticamente.
+              URL do banner principal ou envie uma imagem. O app pode exibir também o carrossel abaixo.
             </p>
             <input
               type="url"
@@ -193,6 +234,82 @@ export default function EventoForm() {
               </p>
             )}
           </div>
+          {isEdit && (
+            <div className="form-group">
+              <label>Carrossel do banner (várias imagens)</label>
+              <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.5rem" }}>
+                Adicione várias imagens para o carrossel na página do evento. Ordem: da esquerda para a direita.
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginBottom: "0.75rem" }}>
+                {bannerImagens.map((img) => (
+                  <div
+                    key={img.id}
+                    style={{
+                      position: "relative",
+                      width: 120,
+                      height: 80,
+                      borderRadius: 8,
+                      overflow: "hidden",
+                      border: "1px solid #e2e8f0",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <img
+                      src={img.url}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveBannerImagem(img.id)}
+                      style={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        width: 24,
+                        height: 24,
+                        borderRadius: "50%",
+                        border: "none",
+                        background: "rgba(0,0,0,0.6)",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontSize: 14,
+                        lineHeight: 1,
+                        padding: 0,
+                      }}
+                      title="Remover"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  disabled={uploadingBanners}
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    if (files?.length) {
+                      handleBannerImagensUpload(files);
+                      e.target.value = "";
+                    }
+                  }}
+                  style={{ maxWidth: "320px" }}
+                />
+                {uploadingBanners && (
+                  <span style={{ fontSize: "0.85rem", color: "#64748b" }}>Enviando...</span>
+                )}
+              </div>
+              {bannerImagens.length > 0 && (
+                <p style={{ marginTop: "0.5rem", fontSize: "0.8rem", color: "#64748b" }}>
+                  {bannerImagens.length} imagem(ns) no carrossel
+                </p>
+              )}
+            </div>
+          )}
           <div className="form-group">
             <label>Mapa (imagem)</label>
             <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.5rem" }}>
