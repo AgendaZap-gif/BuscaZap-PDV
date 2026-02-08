@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLoginUrl, getSiteSecretariaUrl } from "@/const";
-import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone, Star, Bike, Users, UserPlus, CalendarCheck, LogOut } from "lucide-react";
+import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone, Star, Bike, Users, UserPlus, LogOut } from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Home() {
@@ -140,14 +140,6 @@ export default function Home() {
       icon: UserPlus,
       path: "/manage-waiters",
       color: "bg-emerald-600",
-    },
-    {
-      title: "Área da Secretária",
-      description: "Login e gestão da agenda dos médicos pela página web (BuscaZap Brasil)",
-      icon: CalendarCheck,
-      path: "__site_secretaria__",
-      color: "bg-teal-600",
-      externalUrl: getSiteSecretariaUrl(),
     },
   ];
 

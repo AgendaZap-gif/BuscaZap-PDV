@@ -17,7 +17,6 @@ import { PageNav } from "@/components/PageNav";
 import { UserPlus, Trash2 } from "lucide-react";
 
 export default function ManageWaiters() {
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [companyId] = useState<number>(1); // TODO: Pegar do contexto (SelectCompany)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
