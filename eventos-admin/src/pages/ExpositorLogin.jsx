@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login } from "../services/api";
+import { expositorLogin } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
-export default function Login() {
+export default function ExpositorLogin() {
   const navigate = useNavigate();
-  const { login: setAuth } = useAuth();
-  const [email, setEmail] = useState("");
+  const { loginExpositor } = useAuth();
+  const [login, setLogin] = useState("");
   const [senha, setSenha] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,9 +16,9 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      const { token, admin } = await login(email, senha);
-      setAuth(token, admin);
-      navigate("/", { replace: true });
+      const { token, expositor } = await expositorLogin(login.trim(), senha);
+      loginExpositor(token, expositor);
+      navigate("/expositor", { replace: true });
     } catch (err) {
       setError(err.response?.data?.error || "Falha no login. Verifique email e senha.");
     } finally {
@@ -33,26 +33,26 @@ export default function Login() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)",
+        background: "linear-gradient(135deg, #166534 0%, #0f172a 100%)",
       }}
     >
       <div className="card" style={{ width: "100%", maxWidth: 380 }}>
         <h1 style={{ marginTop: 0, marginBottom: "0.5rem", fontSize: "1.5rem" }}>
-          🎪 Eventos Admin
+          🏪 Área do Expositor
         </h1>
         <p style={{ color: "#64748b", marginBottom: "1.5rem", fontSize: "0.875rem" }}>
-          Painel BuscaZap Feira da Cidade
+          Faça login para editar as imagens da sua empresa (logo e título da página).
         </p>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Email</label>
             <input
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@exemplo.com"
+              value={login}
+              onChange={(e) => setLogin(e.target.value)}
+              placeholder="ex: empresa@email.com"
               required
-              autoComplete="email"
+              autoComplete="username"
             />
           </div>
           <div className="form-group">
@@ -76,7 +76,7 @@ export default function Login() {
           </button>
         </form>
         <p style={{ marginTop: "1rem", fontSize: "0.8rem", color: "#64748b", textAlign: "center" }}>
-          <a href="/expositor/login" style={{ color: "#93c5fd" }}>Sou expositor (acessar minha área)</a>
+          <a href="/login" style={{ color: "#166534" }}>Sou administrador do evento</a>
         </p>
       </div>
     </div>

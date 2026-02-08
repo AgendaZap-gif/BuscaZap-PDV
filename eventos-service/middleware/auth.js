@@ -47,4 +47,30 @@ export function requireEventoAccess(req, res, next) {
   return res.status(403).json({ error: "Sem permissão para este evento" });
 }
 
+/**
+ * Verifica JWT do expositor (área do expositor no painel).
+ * req.expositor = { id, eventoId, nome }
+ */
+export function requireExpositor(req, res, next) {
+  const auth = req.headers.authorization;
+  const token = auth?.startsWith("Bearer ") ? auth.slice(7) : null;
+  if (!token) {
+    return res.status(401).json({ error: "Token ausente" });
+  }
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    if (payload.tipo !== "expositor") {
+      return res.status(401).json({ error: "Token inválido" });
+    }
+    req.expositor = {
+      id: payload.expositorId,
+      eventoId: payload.eventoId,
+      nome: payload.nome,
+    };
+    next();
+  } catch {
+    return res.status(401).json({ error: "Token inválido" });
+  }
+}
+
 export { JWT_SECRET };

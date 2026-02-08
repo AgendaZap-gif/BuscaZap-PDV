@@ -59,7 +59,8 @@ router.get("/:id/expositores", async (req, res) => {
     }
     const [rows] = await pool.query(
       `SELECT e.id, e.evento_id AS eventoId, e.categoria_id AS categoriaId, c.nome AS categoria,
-        e.nome, e.whatsapp, e.estande, e.promocao, e.destaque, e.patrocinado, e.pos_x AS posX, e.pos_y AS posY
+        e.nome, e.whatsapp, e.estande, e.promocao, e.destaque, e.patrocinado, e.pos_x AS posX, e.pos_y AS posY,
+        e.logo_url AS logoUrl, e.imagem_titulo_url AS imagemTituloUrl, e.banner_url AS bannerUrl
        FROM expositores e
        LEFT JOIN categorias c ON c.id = e.categoria_id
        WHERE e.evento_id = ?
@@ -82,7 +83,8 @@ router.get("/:id/promocoes", async (req, res) => {
     }
     const [rows] = await pool.query(
       `SELECT e.id, e.evento_id AS eventoId, e.categoria_id AS categoriaId, c.nome AS categoria,
-        e.nome, e.whatsapp, e.estande, e.promocao, e.destaque, e.patrocinado, e.pos_x AS posX, e.pos_y AS posY
+        e.nome, e.whatsapp, e.estande, e.promocao, e.destaque, e.patrocinado, e.pos_x AS posX, e.pos_y AS posY,
+        e.logo_url AS logoUrl, e.imagem_titulo_url AS imagemTituloUrl, e.banner_url AS bannerUrl
        FROM expositores e
        LEFT JOIN categorias c ON c.id = e.categoria_id
        WHERE e.evento_id = ? AND e.promocao IS NOT NULL AND e.promocao != ''

@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import bcrypt from "bcryptjs";
 import pool from "../db.js";
 import { requireAdmin, requireMaster, requireEventoAccess } from "../middleware/auth.js";
 
@@ -9,7 +10,7 @@ const router = Router();
 router.use(requireAdmin);
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "eventos");
-for (const sub of ["banner", "mapa"]) {
+for (const sub of ["banner", "mapa", "expositor-logo", "expositor-titulo", "expositor-banner"]) {
   const dir = path.join(UPLOAD_DIR, sub);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
@@ -37,10 +38,11 @@ function getBaseUrl(req) {
   return `${proto}://${host}`;
 }
 
-// POST /admin/eventos/upload - upload de imagem; query: tipo=banner|mapa; body: file. Retorna { url }
+// POST /admin/eventos/upload - upload de imagem; query: tipo=banner|mapa|expositor-logo|expositor-titulo|expositor-banner; body: file. Retorna { url }
 router.post("/eventos/upload", (req, res, next) => {
   const tipo = (req.query?.tipo || "banner").toString().toLowerCase();
-  const dirTipo = tipo === "mapa" ? "mapa" : "banner";
+  const allowed = ["banner", "mapa", "expositor-logo", "expositor-titulo", "expositor-banner"];
+  const dirTipo = allowed.includes(tipo) ? tipo : "banner";
   const upload = makeUpload(dirTipo);
   upload(req, res, (err) => {
     if (err) {
@@ -218,7 +220,8 @@ router.get("/eventos/:id/expositores", requireEventoAccess, async (req, res) => 
   try {
     const id = parseInt(req.params.id, 10);
     const [rows] = await pool.query(
-      `SELECT e.id, e.evento_id AS eventoId, e.categoria_id AS categoriaId, c.nome AS categoria, e.nome, e.whatsapp, e.estande, e.promocao, e.destaque, e.patrocinado, e.pos_x AS posX, e.pos_y AS posY
+      `SELECT e.id, e.evento_id AS eventoId, e.categoria_id AS categoriaId, c.nome AS categoria, e.nome, e.whatsapp, e.estande, e.promocao, e.destaque, e.patrocinado, e.pos_x AS posX, e.pos_y AS posY,
+        e.logo_url AS logoUrl, e.imagem_titulo_url AS imagemTituloUrl, e.banner_url AS bannerUrl, e.login
        FROM expositores e LEFT JOIN categorias c ON c.id = e.categoria_id WHERE e.evento_id = ? ORDER BY e.nome ASC`,
       [id]
     );
@@ -233,12 +236,16 @@ router.get("/eventos/:id/expositores", requireEventoAccess, async (req, res) => 
 router.post("/eventos/:id/expositores", requireEventoAccess, async (req, res) => {
   try {
     const eventoId = parseInt(req.params.id, 10);
-    const { nome, categoria, whatsapp, estande, promocao, destaque, patrocinado, posX, posY } = req.body || {};
+    const { nome, categoria, whatsapp, estande, promocao, destaque, patrocinado, posX, posY, logoUrl, imagemTituloUrl, bannerUrl, login, senha } = req.body || {};
     if (!nome?.trim()) return res.status(400).json({ error: "Nome obrigatório" });
     const categoriaId = await getOrCreateCategoriaId(categoria);
+    let senhaHash = null;
+    if (login?.trim() && senha) {
+      senhaHash = await bcrypt.hash(senha, 10);
+    }
     const [result] = await pool.query(
-      `INSERT INTO expositores (evento_id, categoria_id, nome, whatsapp, estande, promocao, destaque, patrocinado, pos_x, pos_y)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO expositores (evento_id, categoria_id, nome, whatsapp, estande, promocao, destaque, patrocinado, pos_x, pos_y, logo_url, imagem_titulo_url, banner_url, login, senha)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         eventoId,
         categoriaId,
@@ -250,15 +257,21 @@ router.post("/eventos/:id/expositores", requireEventoAccess, async (req, res) =>
         patrocinado ? 1 : 0,
         posX ?? 0,
         posY ?? 0,
+        logoUrl || null,
+        imagemTituloUrl || null,
+        bannerUrl || null,
+        login?.trim()?.toLowerCase() || null,
+        senhaHash,
       ]
     );
     const [rows] = await pool.query(
-      `SELECT e.id, e.evento_id AS eventoId, e.categoria_id AS categoriaId, c.nome AS categoria, e.nome, e.whatsapp, e.estande, e.promocao, e.destaque, e.patrocinado, e.pos_x AS posX, e.pos_y AS posY
+      `SELECT e.id, e.evento_id AS eventoId, e.categoria_id AS categoriaId, c.nome AS categoria, e.nome, e.whatsapp, e.estande, e.promocao, e.destaque, e.patrocinado, e.pos_x AS posX, e.pos_y AS posY, e.logo_url AS logoUrl, e.imagem_titulo_url AS imagemTituloUrl, e.banner_url AS bannerUrl, e.login
        FROM expositores e LEFT JOIN categorias c ON c.id = e.categoria_id WHERE e.id = ?`,
       [result.insertId]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
+    if (err.code === "ER_DUP_ENTRY") return res.status(400).json({ error: "Este login já está em uso por outro expositor." });
     console.error("POST /admin/eventos/:id/expositores", err);
     res.status(500).json({ error: "Erro ao criar expositor" });
   }
@@ -274,30 +287,42 @@ router.put("/expositores/:id", async (req, res) => {
     if (req.admin.role !== "master" && req.admin.eventoId !== eventoId) {
       return res.status(403).json({ error: "Sem permissão" });
     }
-    const { nome, categoria, whatsapp, estande, promocao, destaque, patrocinado, posX, posY } = req.body || {};
+    const { nome, categoria, whatsapp, estande, promocao, destaque, patrocinado, posX, posY, logoUrl, imagemTituloUrl, bannerUrl, login, senha } = req.body || {};
     const categoriaId = await getOrCreateCategoriaId(categoria);
-    await pool.query(
-      `UPDATE expositores SET categoria_id = ?, nome = ?, whatsapp = ?, estande = ?, promocao = ?, destaque = ?, patrocinado = ?, pos_x = ?, pos_y = ? WHERE id = ?`,
-      [
-        categoriaId,
-        nome ?? "",
-        whatsapp ?? null,
-        estande ?? null,
-        promocao ?? null,
-        destaque ? 1 : 0,
-        patrocinado ? 1 : 0,
-        posX ?? 0,
-        posY ?? 0,
-        id,
-      ]
-    );
+    let updates = "categoria_id = ?, nome = ?, whatsapp = ?, estande = ?, promocao = ?, destaque = ?, patrocinado = ?, pos_x = ?, pos_y = ?, logo_url = ?, imagem_titulo_url = ?, banner_url = ?";
+    const values = [
+      categoriaId,
+      nome ?? "",
+      whatsapp ?? null,
+      estande ?? null,
+      promocao ?? null,
+      destaque ? 1 : 0,
+      patrocinado ? 1 : 0,
+      posX ?? 0,
+      posY ?? 0,
+      logoUrl ?? null,
+      imagemTituloUrl ?? null,
+      bannerUrl ?? null,
+    ];
+    if (login !== undefined) {
+      updates += ", login = ?";
+      values.push(login?.trim()?.toLowerCase() || null);
+    }
+    if (senha !== undefined && senha !== "" && senha != null) {
+      const senhaHash = await bcrypt.hash(senha, 10);
+      updates += ", senha = ?";
+      values.push(senhaHash);
+    }
+    values.push(id);
+    await pool.query(`UPDATE expositores SET ${updates} WHERE id = ?`, values);
     const [rows] = await pool.query(
-      `SELECT e.id, e.evento_id AS eventoId, e.categoria_id AS categoriaId, c.nome AS categoria, e.nome, e.whatsapp, e.estande, e.promocao, e.destaque, e.patrocinado, e.pos_x AS posX, e.pos_y AS posY
+      `SELECT e.id, e.evento_id AS eventoId, e.categoria_id AS categoriaId, c.nome AS categoria, e.nome, e.whatsapp, e.estande, e.promocao, e.destaque, e.patrocinado, e.pos_x AS posX, e.pos_y AS posY, e.logo_url AS logoUrl, e.imagem_titulo_url AS imagemTituloUrl, e.banner_url AS bannerUrl, e.login
        FROM expositores e LEFT JOIN categorias c ON c.id = e.categoria_id WHERE e.id = ?`,
       [id]
     );
     res.json(rows[0]);
   } catch (err) {
+    if (err.code === "ER_DUP_ENTRY") return res.status(400).json({ error: "Este login já está em uso por outro expositor." });
     console.error("PUT /admin/expositores/:id", err);
     res.status(500).json({ error: "Erro ao atualizar expositor" });
   }

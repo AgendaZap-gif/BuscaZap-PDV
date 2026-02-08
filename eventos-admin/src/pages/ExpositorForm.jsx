@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { getEvento, listExpositores, createExpositor, updateExpositor } from "../services/api";
+import { getEvento, listExpositores, createExpositor, updateExpositor, uploadEventoImage } from "../services/api";
 
 export default function ExpositorForm() {
   const navigate = useNavigate();
@@ -10,6 +10,9 @@ export default function ExpositorForm() {
   const [evento, setEvento] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingTitulo, setUploadingTitulo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   const [form, setForm] = useState({
     nome: "",
     categoria: "",
@@ -20,6 +23,11 @@ export default function ExpositorForm() {
     patrocinado: false,
     posX: 0,
     posY: 0,
+    logoUrl: "",
+    imagemTituloUrl: "",
+    bannerUrl: "",
+    login: "",
+    senha: "",
   });
 
   useEffect(() => {
@@ -44,6 +52,11 @@ export default function ExpositorForm() {
           patrocinado: Boolean(e.patrocinado),
           posX: e.posX ?? 0,
           posY: e.posY ?? 0,
+          logoUrl: e.logoUrl || "",
+          imagemTituloUrl: e.imagemTituloUrl || "",
+          bannerUrl: e.bannerUrl || "",
+          login: e.email || "",
+          senha: "",
         });
       }
     });
@@ -51,6 +64,23 @@ export default function ExpositorForm() {
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleUpload = async (field, tipo, file) => {
+    if (!file?.type?.startsWith("image/")) {
+      alert("Selecione uma imagem (JPG, PNG, etc.).");
+      return;
+    }
+    const setters = { logoUrl: setUploadingLogo, imagemTituloUrl: setUploadingTitulo, bannerUrl: setUploadingBanner };
+    setters[field](true);
+    try {
+      const data = await uploadEventoImage(file, tipo);
+      setForm((prev) => ({ ...prev, [field]: data.url }));
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao enviar imagem.");
+    } finally {
+      setters[field](false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -61,11 +91,16 @@ export default function ExpositorForm() {
         ...form,
         posX: Number(form.posX) || 0,
         posY: Number(form.posY) || 0,
+        email: form.login?.trim() || null,
       };
+      delete payload.login;
+      if (isEdit && payload.senha === "") delete payload.senha;
       if (isEdit) {
         await updateExpositor(id, payload);
         alert("Expositor atualizado.");
       } else {
+        if (!payload.senha) delete payload.senha;
+        if (!payload.email) delete payload.email;
         await createExpositor(eventoId, payload);
         alert("Expositor criado. Use o Editor de mapa para posicionar no mapa.");
       }
@@ -173,6 +208,101 @@ export default function ExpositorForm() {
               />
             </div>
           </div>
+
+          <hr style={{ margin: "1.25rem 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+          <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>Imagens (upload pela empresa ou pelo admin)</h3>
+          <div className="form-group">
+            <label>Logo (aparece nos pins do mapa)</label>
+            <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.5rem" }}>Imagem que aparece no pin da empresa no mapa da feira.</p>
+            {form.logoUrl && (
+              <div style={{ marginBottom: "0.5rem" }}>
+                <img src={form.logoUrl} alt="Logo" style={{ maxWidth: 80, maxHeight: 80, objectFit: "contain", borderRadius: 8, border: "1px solid #e2e8f0" }} />
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              disabled={uploadingLogo}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleUpload("logoUrl", "expositor-logo", f);
+                e.target.value = "";
+              }}
+              style={{ maxWidth: "280px" }}
+            />
+            {uploadingLogo && <span style={{ fontSize: "0.85rem", color: "#64748b", marginLeft: "0.5rem" }}>Enviando...</span>}
+          </div>
+          <div className="form-group">
+            <label>Imagem do título (cabeçalho da página no app)</label>
+            <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.5rem" }}>Quando o usuário clica no pin, esta imagem aparece no topo da página da empresa.</p>
+            {form.imagemTituloUrl && (
+              <div style={{ marginBottom: "0.5rem" }}>
+                <img src={form.imagemTituloUrl} alt="Título" style={{ maxWidth: "100%", maxHeight: 120, objectFit: "cover", borderRadius: 8, border: "1px solid #e2e8f0" }} />
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              disabled={uploadingTitulo}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleUpload("imagemTituloUrl", "expositor-titulo", f);
+                e.target.value = "";
+              }}
+              style={{ maxWidth: "280px" }}
+            />
+            {uploadingTitulo && <span style={{ fontSize: "0.85rem", color: "#64748b", marginLeft: "0.5rem" }}>Enviando...</span>}
+          </div>
+          {form.patrocinado && (
+            <div className="form-group">
+              <label>Banner (patrocinador oficial no mapa da feira)</label>
+              <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.5rem" }}>Banner do patrocinador oficial exibido acima do mapa no app. Upload pelo BuscaZap/admin.</p>
+              {form.bannerUrl && (
+                <div style={{ marginBottom: "0.5rem" }}>
+                  <img src={form.bannerUrl} alt="Banner" style={{ maxWidth: "100%", maxHeight: 80, objectFit: "cover", borderRadius: 8, border: "1px solid #e2e8f0" }} />
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                disabled={uploadingBanner}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleUpload("bannerUrl", "expositor-banner", f);
+                  e.target.value = "";
+                }}
+                style={{ maxWidth: "280px" }}
+              />
+              {uploadingBanner && <span style={{ fontSize: "0.85rem", color: "#64748b", marginLeft: "0.5rem" }}>Enviando...</span>}
+            </div>
+          )}
+
+          <hr style={{ margin: "1.25rem 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+          <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>Acesso do expositor (área própria)</h3>
+          <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.75rem" }}>Com login e senha o expositor pode acessar a área dele e fazer upload das próprias imagens (logo e título).</p>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Email (login do expositor)</label>
+              <input
+                type="email"
+                value={form.login}
+                onChange={(e) => handleChange("login", e.target.value)}
+                placeholder="ex: empresa@email.com"
+                autoComplete="username"
+              />
+            </div>
+            <div className="form-group">
+              <label>{isEdit ? "Nova senha (deixe em branco para não alterar)" : "Senha"}</label>
+              <input
+                type="password"
+                value={form.senha}
+                onChange={(e) => handleChange("senha", e.target.value)}
+                placeholder={isEdit ? "••••••••" : "Mín. 6 caracteres"}
+                autoComplete={isEdit ? "new-password" : "new-password"}
+              />
+            </div>
+          </div>
+
           <p style={{ fontSize: "0.875rem", color: "#64748b" }}>
             Dica: use o <Link to={`/eventos/${eventoId}/mapa`}>Editor de mapa</Link> para clicar e definir a posição automaticamente.
           </p>

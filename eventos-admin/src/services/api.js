@@ -8,7 +8,9 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("eventos_admin_token");
+  const adminToken = localStorage.getItem("eventos_admin_token");
+  const expositorToken = localStorage.getItem("eventos_expositor_token");
+  const token = adminToken || expositorToken;
   if (token) config.headers.Authorization = `Bearer ${token}`;
   // Para FormData, não definir Content-Type: o navegador define multipart/form-data com boundary
   if (config.data instanceof FormData) delete config.headers["Content-Type"];
@@ -19,9 +21,12 @@ api.interceptors.response.use(
   (r) => r,
   (err) => {
     if (err.response?.status === 401) {
+      const isExpositor = !!localStorage.getItem("eventos_expositor_token");
       localStorage.removeItem("eventos_admin_token");
       localStorage.removeItem("eventos_admin_user");
-      window.location.href = "/login";
+      localStorage.removeItem("eventos_expositor_token");
+      localStorage.removeItem("eventos_expositor_user");
+      window.location.href = isExpositor ? "/expositor/login" : "/login";
     }
     return Promise.reject(err);
   }
@@ -76,5 +81,16 @@ export const createExpositor = (eventoId, data) =>
 export const updateExpositor = (id, data) =>
   api.put(`/admin/expositores/${id}`, data).then((r) => r.data);
 export const deleteExpositor = (id) => api.delete(`/admin/expositores/${id}`);
+
+// Área do expositor (login próprio)
+export const expositorLogin = (email, senha) =>
+  api.post("/expositor/login", { email, senha }).then((r) => r.data);
+export const getExpositorMe = () => api.get("/expositor/me").then((r) => r.data);
+export const updateExpositorMe = (data) => api.put("/expositor/me", data).then((r) => r.data);
+export const uploadExpositorImage = (file, tipo = "logo") => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api.post(`/expositor/upload?tipo=${encodeURIComponent(tipo)}`, formData).then((r) => r.data);
+};
 
 export default api;
