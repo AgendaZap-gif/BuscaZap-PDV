@@ -6,9 +6,12 @@ import { publicProcedure, protectedProcedure, companyProcedure, router } from ".
 import { z } from "zod";
 import * as db from "./db";
 import * as agendaDb from "./agendaDb";
+import { createRequire } from "module";
 import { buildCompanyPrompt, companyToBrainData, parseDataBlock, type DataBlock } from "./_core/buscazapBrain";
 import { geminiChat, toGeminiMessages, isGeminiConfigured, geminiExtractTextFromImage } from "./_core/gemini";
-import pdfParse from "pdf-parse";
+
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text: string }>;
 
 export const appRouter = router({
   system: systemRouter,
