@@ -7,6 +7,7 @@ import cron from "node-cron";
 import * as db from "../db.js";
 import { generateDailySummary } from "./summarizer.js";
 import { notifyOwner } from "./notification.js";
+import { notifyLowEngagementCompanies } from "./engagement.js";
 
 function normalizePhone(p: string): string {
   return p.replace(/\D/g, "").slice(-11) || p;
@@ -131,9 +132,9 @@ async function runDailySummaries(): Promise<void> {
   }
 }
 
-/** Engagement: reduz score de empresas inativas e notifica se < 40. */
+/** Engagement: verifica empresas com baixo score e notifica o dono. */
 async function runEngagementCheck(): Promise<void> {
-  await decreaseEngagementScore();
+  await notifyLowEngagementCompanies();
 }
 
 export function startCrons(): void {
