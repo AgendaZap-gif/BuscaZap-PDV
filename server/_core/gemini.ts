@@ -100,3 +100,58 @@ export function toGeminiMessages(messages: Array<{ role: string; content: string
   }
   return out;
 }
+
+/** Partes multimodais: texto ou imagem inline (base64) */
+type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
+
+/**
+ * Extrai texto de uma imagem usando visão do Gemini (OCR).
+ * Útil para cardápios, catálogos, documentos escaneados.
+ */
+export async function geminiExtractTextFromImage(
+  base64Data: string,
+  mimeType: string
+): Promise<string> {
+  const apiKey = ENV.geminiApiKey?.trim();
+  if (!apiKey) throw new Error("GEMINI_API_KEY is not configured");
+
+  const model = getModel();
+  const url = `${BASE}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const parts: GeminiPart[] = [
+    {
+      inlineData: {
+        mimeType: mimeType || "image/jpeg",
+        data: base64Data.replace(/^data:image\/\w+;base64,/, ""),
+      },
+    },
+    {
+      text:
+        "Extraia todo o texto visível desta imagem (cardápio, catálogo, documento). Retorne apenas o texto extraído, preservando a estrutura quando possível (listas, preços, títulos). Não adicione comentários ou formatação extra.",
+    },
+  ];
+
+  const body = {
+    contents: [{ role: "user", parts }],
+    generationConfig: {
+      maxOutputTokens: 8192,
+      temperature: 0.2,
+    },
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini API error: ${res.status} – ${errText}`);
+  }
+
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  return (data.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim();
+}

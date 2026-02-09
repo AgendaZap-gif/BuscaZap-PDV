@@ -7,7 +7,8 @@ import { z } from "zod";
 import * as db from "./db";
 import * as agendaDb from "./agendaDb";
 import { buildCompanyPrompt, companyToBrainData, parseDataBlock, type DataBlock } from "./_core/buscazapBrain";
-import { geminiChat, toGeminiMessages, isGeminiConfigured } from "./_core/gemini";
+import { geminiChat, toGeminiMessages, isGeminiConfigured, geminiExtractTextFromImage } from "./_core/gemini";
+import pdfParse from "pdf-parse";
 
 export const appRouter = router({
   system: systemRouter,
@@ -221,6 +222,86 @@ export const appRouter = router({
           dataBlock: dataBlock ?? undefined,
           model: result.model,
         };
+      }),
+
+    /**
+     * Extrai texto de arquivos (PDF e imagens) para treinar a base de conhecimento da IA.
+     * Usado no painel "Configurar assistente IA" ao importar cardápio, catálogo etc.
+     * - Imagens: usa Gemini Vision (OCR)
+     * - PDF: usa pdf-parse
+     */
+    extractKnowledgeFromFiles: publicProcedure
+      .input(
+        z.object({
+          companyId: z.number(),
+          files: z.array(
+            z.object({
+              base64: z.string(),
+              mimeType: z.string(),
+              fileName: z.string().optional(),
+            })
+          ),
+        })
+      )
+      .mutation(async ({ input }) => {
+        if (!isGeminiConfigured()) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "IA não configurada. Defina GEMINI_API_KEY no servidor.",
+          });
+        }
+
+        const company = await db.getCompanyById(input.companyId);
+        if (!company) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Empresa não encontrada." });
+        }
+
+        const IMAGE_MIMES = [
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+        ];
+        const extractedChunks: string[] = [];
+
+        for (const file of input.files) {
+          const mime = file.mimeType?.toLowerCase() || "";
+          const base64Clean = file.base64.replace(/^data:[^;]+;base64,/, "");
+
+          try {
+            if (mime === "application/pdf") {
+              const buffer = Buffer.from(base64Clean, "base64");
+              const pdfData = await pdfParse(buffer);
+              if (pdfData?.text?.trim()) {
+                extractedChunks.push(`\n--- Conteúdo do PDF "${file.fileName || "documento"}": ---\n${pdfData.text.trim()}`);
+              }
+            } else if (IMAGE_MIMES.includes(mime)) {
+              const text = await geminiExtractTextFromImage(base64Clean, mime);
+              if (text?.trim()) {
+                extractedChunks.push(`\n--- Conteúdo da imagem "${file.fileName || "imagem"}": ---\n${text.trim()}`);
+              }
+            } else {
+              throw new Error(`Tipo de arquivo não suportado: ${mime}. Use PDF ou imagens (JPEG, PNG, GIF, WebP).`);
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Erro ao processar arquivo";
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Erro ao processar "${file.fileName || "arquivo"}": ${msg}`,
+            });
+          }
+        }
+
+        const extractedText = extractedChunks.join("\n").trim();
+        if (!extractedText) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Nenhum texto foi extraído dos arquivos. Verifique se os arquivos contêm texto legível.",
+          });
+        }
+
+        return { extractedText };
       }),
   }),
 
