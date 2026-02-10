@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { PageNav } from '@/components/PageNav';
 import { trpc } from '@/lib/trpc';
+import { useAuth } from '@/_core/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,11 +11,12 @@ import { Loader2, Wifi, WifiOff, TrendingUp, Clock, DollarSign } from 'lucide-re
 
 export default function DeliveryControl() {
   const { toast } = useToast();
-  const [companyId, setCompanyId] = useState<number>(1); // TODO: Pegar do contexto de autenticação
+  const { user } = useAuth();
+  const companyId = user?.companyId ?? user?.id ?? 0;
 
   const { data: settings, isLoading, refetch } = trpc.delivery.getSettings.useQuery(
-    { companyId },
-    { refetchInterval: 5000 } // Atualizar a cada 5 segundos
+    undefined,
+    { refetchInterval: 5000, enabled: companyId > 0 }
   );
 
   const toggleMutation = trpc.delivery.toggleOnlineStatus.useMutation({
@@ -55,15 +57,14 @@ export default function DeliveryControl() {
 
   const handleToggle = async () => {
     if (!settings) return;
-    
+
     await toggleMutation.mutateAsync({
-      companyId,
       isOnline: !settings.isOnlineForOrders,
     });
   };
 
   const handleActivate = async () => {
-    await activateMutation.mutateAsync({ companyId });
+    await activateMutation.mutateAsync({});
   };
 
   if (isLoading) {

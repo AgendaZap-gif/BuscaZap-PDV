@@ -1805,39 +1805,53 @@ export const appRouter = router({
     
     // Ativar empresa no PediJá
     activateOnPedija: protectedProcedure
-      .input(z.object({ companyId: z.number() }))
+      .input(z.object({ companyId: z.number().optional() }).optional())
       .mutation(async ({ input, ctx }) => {
-        // Verificar se é admin ou dono da empresa
-        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
-          throw new Error('Acesso negado');
+        const effectiveCompanyId = ctx.user?.role === 'admin_global' && input?.companyId != null
+          ? input.companyId
+          : (ctx.user?.companyId ?? ctx.user?.id);
+        if (effectiveCompanyId == null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Company não identificada' });
         }
-        
-        return await db.activateCompanyOnPedija(input.companyId);
+        if (ctx.user?.role !== 'admin_global' && (ctx.user?.companyId ?? ctx.user?.id) !== effectiveCompanyId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
+        }
+        return await db.activateCompanyOnPedija(effectiveCompanyId);
       }),
     
     // Desativar empresa do PediJá
     deactivateFromPedija: protectedProcedure
-      .input(z.object({ companyId: z.number() }))
+      .input(z.object({ companyId: z.number().optional() }).optional())
       .mutation(async ({ input, ctx }) => {
-        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
-          throw new Error('Acesso negado');
+        const effectiveCompanyId = ctx.user?.role === 'admin_global' && input?.companyId != null
+          ? input.companyId
+          : (ctx.user?.companyId ?? ctx.user?.id);
+        if (effectiveCompanyId == null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Company não identificada' });
         }
-        
-        return await db.deactivateCompanyFromPedija(input.companyId);
+        if (ctx.user?.role !== 'admin_global' && (ctx.user?.companyId ?? ctx.user?.id) !== effectiveCompanyId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
+        }
+        return await db.deactivateCompanyFromPedija(effectiveCompanyId);
       }),
     
     // Ativar/desativar status online para pedidos (via PDV)
     toggleOnlineStatus: protectedProcedure
       .input(z.object({
-        companyId: z.number(),
+        companyId: z.number().optional(),
         isOnline: z.boolean(),
       }))
       .mutation(async ({ input, ctx }) => {
-        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
-          throw new Error('Acesso negado');
+        const effectiveCompanyId = ctx.user?.role === 'admin_global' && input.companyId != null
+          ? input.companyId
+          : (ctx.user?.companyId ?? ctx.user?.id);
+        if (effectiveCompanyId == null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Company não identificada' });
         }
-        
-        return await db.toggleCompanyOnlineStatus(input.companyId, input.isOnline);
+        if (ctx.user?.role !== 'admin_global' && (ctx.user?.companyId ?? ctx.user?.id) !== effectiveCompanyId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
+        }
+        return await db.toggleCompanyOnlineStatus(effectiveCompanyId, input.isOnline);
       }),
     
     // Buscar empresas online no PediJá
@@ -1853,40 +1867,55 @@ export const appRouter = router({
     // Adicionar entregador próprio
     addDriver: protectedProcedure
       .input(z.object({
-        companyId: z.number(),
+        companyId: z.number().optional(),
         driverId: z.number(),
       }))
       .mutation(async ({ input, ctx }) => {
-        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
-          throw new Error('Acesso negado');
+        const effectiveCompanyId = ctx.user?.role === 'admin_global' && input.companyId != null
+          ? input.companyId
+          : (ctx.user?.companyId ?? ctx.user?.id);
+        if (effectiveCompanyId == null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Company não identificada' });
         }
-        
-        return await db.addCompanyDriver(input.companyId, input.driverId);
+        if (ctx.user?.role !== 'admin_global' && (ctx.user?.companyId ?? ctx.user?.id) !== effectiveCompanyId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
+        }
+        return await db.addCompanyDriver(effectiveCompanyId, input.driverId);
       }),
     
     // Remover entregador próprio
     removeDriver: protectedProcedure
       .input(z.object({
-        companyId: z.number(),
+        companyId: z.number().optional(),
         driverId: z.number(),
       }))
       .mutation(async ({ input, ctx }) => {
-        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
-          throw new Error('Acesso negado');
+        const effectiveCompanyId = ctx.user?.role === 'admin_global' && input.companyId != null
+          ? input.companyId
+          : (ctx.user?.companyId ?? ctx.user?.id);
+        if (effectiveCompanyId == null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Company não identificada' });
         }
-        
-        return await db.removeCompanyDriver(input.companyId, input.driverId);
+        if (ctx.user?.role !== 'admin_global' && (ctx.user?.companyId ?? ctx.user?.id) !== effectiveCompanyId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
+        }
+        return await db.removeCompanyDriver(effectiveCompanyId, input.driverId);
       }),
     
     // Buscar entregadores da empresa
     getDrivers: protectedProcedure
-      .input(z.object({ companyId: z.number() }))
+      .input(z.object({ companyId: z.number().optional() }).optional())
       .query(async ({ input, ctx }) => {
-        if (ctx.user?.role !== 'admin_global' && ctx.user?.companyId !== input.companyId) {
-          throw new Error('Acesso negado');
+        const effectiveCompanyId = ctx.user?.role === 'admin_global' && input?.companyId != null
+          ? input.companyId
+          : (ctx.user?.companyId ?? ctx.user?.id);
+        if (effectiveCompanyId == null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Company não identificada' });
         }
-        
-        return await db.getCompanyDrivers(input.companyId);
+        if (ctx.user?.role !== 'admin_global' && (ctx.user?.companyId ?? ctx.user?.id) !== effectiveCompanyId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
+        }
+        return await db.getCompanyDrivers(effectiveCompanyId);
       }),
     
     // Buscar pedidos para entregador próprio
