@@ -93,4 +93,45 @@ export const uploadExpositorImage = (file, tipo = "logo") => {
   return api.post(`/expositor/upload?tipo=${encodeURIComponent(tipo)}`, formData).then((r) => r.data);
 };
 
+// Arquivos do expositor (catálogos, PDFs, imagens para cards)
+export const uploadExpositorArquivo = (file, { tipo = "catalogo", titulo } = {}) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (titulo) formData.append("titulo", titulo);
+  const q = `tipo=${encodeURIComponent(tipo)}`;
+  return api.post(`/expositor/arquivos/upload?${q}`, formData).then((r) => r.data);
+};
+
+export const listExpositorArquivos = () =>
+  api.get("/expositor/arquivos").then((r) => r.data);
+
+export const deleteExpositorArquivo = (id) =>
+  api.delete(`/expositor/arquivos/${id}`);
+
+// Cards do expositor (produtos/serviços/destaques visíveis na página da feira)
+export const listExpositorCards = () =>
+  api.get("/expositor/cards").then((r) => r.data);
+
+export const createExpositorCard = (data) =>
+  api.post("/expositor/cards", data).then((r) => r.data);
+
+export const updateExpositorCard = (id, data) =>
+  api.put(`/expositor/cards/${id}`, data).then((r) => r.data);
+
+export const deleteExpositorCard = (id) =>
+  api.delete(`/expositor/cards/${id}`);
+
+// Base de conhecimento do expositor (treinamento da IA)
+export const listExpositorKnowledge = () =>
+  api.get("/expositor/knowledge").then((r) => r.data);
+
+export const createExpositorKnowledgeTexto = (data) =>
+  api.post("/expositor/knowledge/texto", data).then((r) => r.data);
+
+export const createExpositorKnowledgeArquivo = (data) =>
+  api.post("/expositor/knowledge/arquivo", data).then((r) => r.data);
+
+export const deleteExpositorKnowledge = (id) =>
+  api.delete(`/expositor/knowledge/${id}`);
+
 export default api;

@@ -9,6 +9,7 @@ import * as agendaDb from "./agendaDb";
 import { createRequire } from "module";
 import { buildCompanyPrompt, companyToBrainData, parseDataBlock, type DataBlock } from "./_core/buscazapBrain";
 import { geminiChat, toGeminiMessages, isGeminiConfigured, geminiExtractTextFromImage } from "./_core/gemini";
+import { ENV } from "./_core/env";
 
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse") as (buffer: Buffer) => Promise<{ text: string }>;
@@ -111,9 +112,179 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         if (!isGeminiConfigured()) {
-          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "IA não configurada. Defina GEMINI_API_KEY no servidor." });
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "IA não configurada. Defina GEMINI_API_KEY no servidor.",
+          });
         }
 
+        // Fluxo especial para expositores da feira (companyId negativo)
+        if (input.companyId < 0) {
+          if (!ENV.eventosServiceUrl) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "EVENTOS_SERVICE_URL não configurada no servidor.",
+            });
+          }
+
+          let eventoId: number | null = null;
+          let expositorId: number | null = null;
+          if (input.knowledgeBaseOverride) {
+            try {
+              const parsed = JSON.parse(input.knowledgeBaseOverride);
+              if (
+                parsed &&
+                parsed.kind === "expositor" &&
+                typeof parsed.eventoId === "number" &&
+                typeof parsed.expositorId === "number"
+              ) {
+                eventoId = parsed.eventoId;
+                expositorId = parsed.expositorId;
+              }
+            } catch {
+              // ignora parse error; cai na validação abaixo
+            }
+          }
+
+          if (!eventoId || !expositorId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "Metadados do expositor ausentes. knowledgeBaseOverride deve conter eventoId e expositorId.",
+            });
+          }
+
+          const url = `${ENV.eventosServiceUrl.replace(/\/$/, "")}/eventos/${eventoId}/expositores/${expositorId}/context`;
+          let contextJson: any;
+          try {
+            const res = await fetch(url);
+            if (!res.ok) {
+              const errBody = await res.json().catch(() => ({}));
+              throw new Error(errBody?.error || `Eventos service: ${res.status}`);
+            }
+            contextJson = await res.json();
+          } catch (err: any) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Erro ao buscar contexto do expositor na feira: ${
+                err?.message || "falha de rede"
+              }`,
+            });
+          }
+
+          const expo = contextJson?.expositor;
+          const cards = Array.isArray(contextJson?.cards) ? contextJson.cards : [];
+          const arquivos = Array.isArray(contextJson?.arquivos)
+            ? contextJson.arquivos
+            : [];
+          const knowledge = Array.isArray(contextJson?.knowledge)
+            ? contextJson.knowledge
+            : [];
+
+          if (!expo) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Expositor da feira não encontrado.",
+            });
+          }
+
+          const linhas: string[] = [];
+          linhas.push(
+            `Você é o assistente virtual de um expositor em uma feira física atendida pelo aplicativo BuscaZap.`
+          );
+          linhas.push(
+            `Sua função é responder dúvidas de visitantes sobre esta empresa, seus produtos/serviços e condições da feira.`
+          );
+          linhas.push(
+            `Mantenha o foco na feira atual, use linguagem simples em português do Brasil e seja objetivo.`
+          );
+
+          linhas.push(`\n=== Dados básicos do expositor ===`);
+          linhas.push(`Nome: ${expo.nome}`);
+          if (expo.categoria) linhas.push(`Categoria: ${expo.categoria}`);
+          if (expo.estande) linhas.push(`Estande: ${expo.estande}`);
+          if (expo.promocao)
+            linhas.push(`Promoção destacada na feira: ${expo.promocao}`);
+          if (expo.descricao)
+            linhas.push(`Descrição da empresa: ${expo.descricao}`);
+          if (expo.site) linhas.push(`Site: ${expo.site}`);
+          if (expo.instagram) linhas.push(`Instagram: ${expo.instagram}`);
+          if (expo.linkedin) linhas.push(`LinkedIn: ${expo.linkedin}`);
+
+          if (cards.length > 0) {
+            linhas.push(`\n=== Cards de produtos/serviços em destaque ===`);
+            for (const c of cards) {
+              const partes: string[] = [`• ${c.titulo}`];
+              if (c.descricao) partes.push(` - ${c.descricao}`);
+              linhas.push(partes.join(""));
+            }
+          }
+
+          if (arquivos.length > 0) {
+            linhas.push(`\n=== Catálogos e materiais disponíveis ===`);
+            for (const a of arquivos) {
+              linhas.push(`• ${a.titulo} (tipo: ${a.tipo}, mimetype: ${a.mimetype})`);
+            }
+          }
+
+          if (knowledge.length > 0) {
+            linhas.push(`\n=== Conhecimento cadastrado pelo expositor ===`);
+            for (const k of knowledge) {
+              const origem = k.origem === "arquivo" ? "a partir de arquivo" : "texto";
+              const titulo = k.titulo || "Sem título";
+              const conteudo = (k.conteudoTexto || "").toString().trim();
+              linhas.push(`\n[Tema: ${titulo} – origem: ${origem}]`);
+              if (conteudo) {
+                const maxLen = 2000;
+                linhas.push(
+                  conteudo.length > maxLen
+                    ? conteudo.slice(0, maxLen) + "\n(... conteúdo truncado ...)"
+                    : conteudo
+                );
+              }
+            }
+          }
+
+          const knowledgeBase = linhas.join("\n");
+
+          const lastUser = input.messages.filter((m) => m.role === "user").pop();
+          const userContent =
+            lastUser?.content ??
+            input.messages[input.messages.length - 1]?.content ??
+            "";
+
+          const allMessages = input.messages
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m) => ({
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            }));
+          if (allMessages.length === 0 && userContent.trim()) {
+            allMessages.push({ role: "user" as const, content: userContent.trim() });
+          }
+
+          const systemPrompt =
+            knowledgeBase +
+            "\n\nResponda sempre de forma clara, simpática e útil para o visitante da feira.";
+
+          const geminiMessages = toGeminiMessages(allMessages);
+          const result = await geminiChat({
+            systemInstruction: systemPrompt,
+            messages: geminiMessages,
+            maxOutputTokens: 2048,
+            temperature: 0.7,
+          });
+
+          const { text } = parseDataBlock(result.text);
+
+          return {
+            text,
+            dataBlock: undefined,
+            model: result.model,
+          };
+        }
+
+        // Fluxo padrão: empresas do PDV (companyId positivo)
         const company = await db.getCompanyById(input.companyId);
         if (!company) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Empresa não encontrada." });
@@ -123,7 +294,8 @@ export const appRouter = router({
         if (settings?.aiEnabled !== true) {
           throw new TRPCError({
             code: "PRECONDITION_FAILED",
-            message: "Chat com IA não está habilitado para esta empresa. Configure no painel da empresa ou contrate o plano.",
+            message:
+              "Chat com IA não está habilitado para esta empresa. Configure no painel da empresa ou contrate o plano.",
           });
         }
 
@@ -144,16 +316,28 @@ export const appRouter = router({
         }));
 
         const lastUser = input.messages.filter((m) => m.role === "user").pop();
-        const userContent = lastUser?.content ?? input.messages[input.messages.length - 1]?.content ?? "";
+        const userContent =
+          lastUser?.content ??
+          input.messages[input.messages.length - 1]?.content ??
+          "";
 
         if (userContent.trim()) {
-          await db.addMessageToConversation(conv.id, input.companyId, "customer", userContent.trim(), channel);
+          await db.addMessageToConversation(
+            conv.id,
+            input.companyId,
+            "customer",
+            userContent.trim(),
+            channel
+          );
         }
 
         const knowledgeBase =
           input.knowledgeBaseOverride ??
           (await db.getCompanyKnowledgeForBrain(input.companyId));
-        const userBehaviorData = await db.getUserBehaviorSummaryForBrain(input.companyId, customerPhone);
+        const userBehaviorData = await db.getUserBehaviorSummaryForBrain(
+          input.companyId,
+          customerPhone
+        );
 
         const companyData = companyToBrainData(company, undefined);
         const systemPrompt = buildCompanyPrompt(companyData, {
@@ -165,7 +349,10 @@ export const appRouter = router({
           ...historyForLlm,
           ...input.messages
             .filter((m) => m.role === "user" || m.role === "assistant")
-            .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+            .map((m) => ({
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            })),
         ];
         if (allMessages.length === 0 && userContent.trim()) {
           allMessages.push({ role: "user" as const, content: userContent.trim() });
@@ -216,8 +403,14 @@ export const appRouter = router({
             tags: dataBlock.tags,
             crm_update: dataBlock.crm_update,
           });
-          const companyCategory = (company.settings as Record<string, string> | undefined)?.category ?? undefined;
-          await db.trackUserBehavior(input.companyId, customerPhone, "message", companyCategory);
+          const companyCategory = (company.settings as Record<string, string> | undefined)
+            ?.category;
+          await db.trackUserBehavior(
+            input.companyId,
+            customerPhone,
+            "message",
+            companyCategory
+          );
         }
 
         return {

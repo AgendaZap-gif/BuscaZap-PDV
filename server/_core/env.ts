@@ -27,4 +27,6 @@ export const ENV = {
   // SaleBot (confirmação de agendamento por WhatsApp)
   salebotApiUrl: process.env.SALEBOT_API_URL ?? "",
   agendaWebhookSecret: process.env.AGENDA_WEBHOOK_SECRET ?? "",
+  // Microserviço de eventos/feira (buscazap-eventos-service)
+  eventosServiceUrl: process.env.EVENTOS_SERVICE_URL ?? "",
 };
