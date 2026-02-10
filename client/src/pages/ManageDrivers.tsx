@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PageNav } from '@/components/PageNav';
 import { trpc } from '@/lib/trpc';
+import { useAuth } from '@/core/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,16 +14,20 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function ManageDrivers() {
   const { toast } = useToast();
-  const [companyId] = useState<number>(1); // TODO: Pegar do contexto
+  const { user } = useAuth();
+  const companyId = user?.companyId ?? user?.id ?? 0;
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [driverId, setDriverId] = useState('');
   const [isPricingDialogOpen, setIsPricingDialogOpen] = useState(false);
   const [newPrice, setNewPrice] = useState('49.00');
 
-  const { data: settings, refetch: refetchSettings } = trpc.delivery.getSettings.useQuery({ companyId });
+  const { data: settings, refetch: refetchSettings } = trpc.delivery.getSettings.useQuery(
+    undefined,
+    { enabled: companyId > 0 }
+  );
   const { data: drivers, isLoading, refetch } = trpc.delivery.getDrivers.useQuery(
     { companyId },
-    { enabled: settings?.hasOwnDrivers === true }
+    { enabled: companyId > 0 && settings?.hasOwnDrivers === true }
   );
 
   const addDriverMutation = trpc.delivery.addDriver.useMutation({
@@ -104,10 +109,7 @@ export default function ManageDrivers() {
   };
 
   const handleEnableDrivers = async (maxDrivers: number) => {
-    await enableDriversMutation.mutateAsync({
-      companyId,
-      maxDrivers,
-    });
+    await enableDriversMutation.mutateAsync({ maxDrivers });
   };
 
   // Se não tem permissão para entregadores próprios

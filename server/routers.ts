@@ -1792,9 +1792,15 @@ export const appRouter = router({
   delivery: router({
     // Buscar configurações de delivery da empresa
     getSettings: protectedProcedure
-      .input(z.object({ companyId: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getCompanyDeliverySettings(input.companyId);
+      .input(z.object({ companyId: z.number().optional() }).optional())
+      .query(async ({ input, ctx }) => {
+        const effectiveCompanyId = ctx.user?.role === 'admin_global' && input?.companyId != null
+          ? input.companyId
+          : (ctx.user?.companyId ?? ctx.user?.id);
+        if (effectiveCompanyId == null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Company não identificada' });
+        }
+        return await db.getCompanyDeliverySettings(effectiveCompanyId);
       }),
     
     // Ativar empresa no PediJá
@@ -1893,20 +1899,24 @@ export const appRouter = router({
         return await db.getOrdersForCompanyDriver(ctx.user.id);
       }),
     
-    // Habilitar entregadores próprios no plano
+    // Habilitar entregadores próprios no plano (admin global para qualquer empresa; company para a própria)
     enableOwnDrivers: protectedProcedure
       .input(z.object({
-        companyId: z.number(),
+        companyId: z.number().optional(),
         maxDrivers: z.number().min(1).max(50),
       }))
       .mutation(async ({ input, ctx }) => {
-        // Apenas admin global pode habilitar
-        if (ctx.user?.role !== 'admin_global') {
-          throw new Error('Acesso negado');
+        const effectiveCompanyId = ctx.user?.role === 'admin_global' && input.companyId != null
+          ? input.companyId
+          : (ctx.user?.companyId ?? ctx.user?.id);
+        if (effectiveCompanyId == null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Company não identificada' });
         }
-        
+        if (ctx.user?.role !== 'admin_global' && (ctx.user?.companyId ?? ctx.user?.id) !== effectiveCompanyId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
+        }
         return await db.upsertCompanyDeliverySettings({
-          companyId: input.companyId,
+          companyId: effectiveCompanyId,
           hasOwnDrivers: true,
           maxDrivers: input.maxDrivers,
         });
@@ -1914,14 +1924,19 @@ export const appRouter = router({
     
     // Desabilitar entregadores próprios
     disableOwnDrivers: protectedProcedure
-      .input(z.object({ companyId: z.number() }))
+      .input(z.object({ companyId: z.number().optional() }).optional())
       .mutation(async ({ input, ctx }) => {
-        if (ctx.user?.role !== 'admin_global') {
-          throw new Error('Acesso negado');
+        const effectiveCompanyId = ctx.user?.role === 'admin_global' && input?.companyId != null
+          ? input.companyId
+          : (ctx.user?.companyId ?? ctx.user?.id);
+        if (effectiveCompanyId == null) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Company não identificada' });
         }
-        
+        if (ctx.user?.role !== 'admin_global' && (ctx.user?.companyId ?? ctx.user?.id) !== effectiveCompanyId) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Acesso negado' });
+        }
         return await db.upsertCompanyDeliverySettings({
-          companyId: input.companyId,
+          companyId: effectiveCompanyId,
           hasOwnDrivers: false,
           maxDrivers: 0,
         });
