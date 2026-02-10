@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PageNav } from '@/components/PageNav';
 import { trpc } from '@/lib/trpc';
-import { useAuth } from '@/core/hooks/useAuth';
+import { useAuth } from '@/_core/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
