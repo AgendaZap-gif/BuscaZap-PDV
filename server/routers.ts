@@ -867,8 +867,11 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return await db.getCategoriesByCompany(input.companyId);
       }),
-    getAll: protectedProcedure.query(async () => {
-      const companyId = 1; // TODO: Get from ctx.user.companyId
+    getAll: protectedProcedure.query(async ({ ctx }) => {
+      const companyId = ctx.user?.companyId ?? ctx.user?.id;
+      if (!companyId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Empresa não identificada" });
+      }
       return await db.getCategoriesByCompany(companyId);
     }),
   }),
@@ -883,8 +886,10 @@ export const appRouter = router({
     getAll: protectedProcedure
       .input(z.object({ includeInactive: z.boolean().optional() }))
       .query(async ({ ctx, input }) => {
-        // Get company from context or first company
-        const companyId = 1; // TODO: Get from ctx.user.companyId
+        const companyId = ctx.user?.companyId ?? ctx.user?.id;
+        if (!companyId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Empresa não identificada" });
+        }
         return await db.getAllProductsByCompany(companyId, input.includeInactive);
       }),
     listByCategory: protectedProcedure
@@ -905,7 +910,10 @@ export const appRouter = router({
         })
       )
       .mutation(async ({ ctx, input }) => {
-        const companyId = 1; // TODO: Get from ctx.user.companyId
+        const companyId = ctx.user?.companyId ?? ctx.user?.id;
+        if (!companyId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Empresa não identificada" });
+        }
         const id = await db.createProduct({
           companyId,
           name: input.name,
