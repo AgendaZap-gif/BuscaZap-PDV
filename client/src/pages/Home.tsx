@@ -1,13 +1,54 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { getLoginUrl, getSiteSecretariaUrl } from "@/const";
 import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone, Star, Bike, Users, UserPlus, LogOut } from "lucide-react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 
 export default function Home() {
   const { user, loading, isAuthenticated, logout } = useAuth();
   const [, setLocation] = useLocation();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const handleEmailLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLoginError(null);
+    setLoginLoading(true);
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data?.error) {
+        setLoginError(
+          data?.error ||
+            "Não foi possível fazer login. Verifique seu e-mail e senha."
+        );
+        return;
+      }
+
+      // Recarrega a página para que o hook useAuth detecte a nova sessão
+      window.location.reload();
+    } catch (error) {
+      console.error("[Home] Erro no login por e-mail/senha", error);
+      setLoginError("Erro ao conectar ao servidor. Tente novamente.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -32,12 +73,66 @@ export default function Home() {
             <CardDescription>Sistema de Ponto de Venda</CardDescription>
           </CardHeader>
           <CardContent>
+            <form className="space-y-3" onSubmit={handleEmailLogin}>
+              <div className="space-y-1 text-left">
+                <label className="text-sm font-medium" htmlFor="email">
+                  E-mail
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1 text-left">
+                <label className="text-sm font-medium" htmlFor="password">
+                  Senha
+                </label>
+                <Input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Senha"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
+              </div>
+
+              {loginError && (
+                <p className="text-sm text-destructive text-left">
+                  {loginError}
+                </p>
+              )}
+
+              <Button
+                className="w-full"
+                size="lg"
+                type="submit"
+                disabled={loginLoading}
+              >
+                {loginLoading ? "Entrando..." : "Entrar com e-mail e senha"}
+              </Button>
+            </form>
+
+            <div className="flex items-center my-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="px-2 text-xs text-muted-foreground">ou</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+
             <Button
               className="w-full"
               size="lg"
+              variant="outline"
               onClick={() => (window.location.href = getLoginUrl())}
             >
-              Fazer Login
+              Entrar com Google
             </Button>
             <Button
               variant="outline"
