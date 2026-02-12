@@ -59,17 +59,18 @@ export default function Banners() {
   };
 
   const handleEdit = (b) => {
+    if (!b) return;
     setEditingId(b.id);
     setForm({
-      page: b.page || "home",
-      title: b.title || "",
-      description: b.description || "",
-      imageUrl: b.imageUrl || "",
-      linkUrl: b.linkUrl || "",
-      position: b.position || "top",
-      format: b.format || "horizontal",
-      startDate: b.startDate ? String(b.startDate).slice(0, 10) : "",
-      endDate: b.endDate ? String(b.endDate).slice(0, 10) : "",
+      page: b?.page || "home",
+      title: b?.title || "",
+      description: b?.description || "",
+      imageUrl: b?.imageUrl || "",
+      linkUrl: b?.linkUrl || "",
+      position: b?.position || "top",
+      format: b?.format || "horizontal",
+      startDate: b?.startDate ? String(b.startDate).slice(0, 10) : "",
+      endDate: b?.endDate ? String(b.endDate).slice(0, 10) : "",
     });
     setShowForm(true);
   };
@@ -313,8 +314,8 @@ export default function Banners() {
                       <span style={{ color: "#94a3b8" }}>—</span>
                     )}
                   </td>
-                  <td>{b.title || "—"}</td>
-                  <td>{b.page === "guia_comercial" ? "Guia comercial" : "Home"}</td>
+                  <td>{b?.title || "—"}</td>
+                  <td>{b?.page === "guia_comercial" ? "Guia comercial" : "Home"}</td>
                   <td>
                     {isMaster ? (
                       <button
