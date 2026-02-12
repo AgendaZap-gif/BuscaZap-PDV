@@ -346,4 +346,156 @@ router.delete("/expositores/:id", async (req, res) => {
   }
 });
 
+// ========== Banners publicitários (apenas master) ==========
+// GET /admin/banners - listar (query: cityId?, page?, includeInactive?)
+router.get("/banners", requireMaster, async (req, res) => {
+  try {
+    const { cityId, page, includeInactive } = req.query;
+    let sql = `SELECT id, city_id AS cityId, page, title, description, image_url AS imageUrl, link_url AS linkUrl,
+      position, format, is_active AS isActive, start_date AS startDate, end_date AS endDate,
+      created_at AS createdAt, updated_at AS updatedAt FROM banners WHERE 1=1`;
+    const params = [];
+    if (cityId != null && cityId !== "") {
+      sql += " AND (city_id IS NULL OR city_id = ?)";
+      params.push(parseInt(cityId, 10));
+    }
+    if (page === "home" || page === "guia_comercial") {
+      sql += " AND page = ?";
+      params.push(page);
+    }
+    if (includeInactive === "false" || includeInactive === false) {
+      sql += " AND is_active = 1";
+      const now = new Date().toISOString().slice(0, 10);
+      sql += " AND (start_date IS NULL OR start_date <= ?) AND (end_date IS NULL OR end_date >= ?)";
+      params.push(now, now);
+    }
+    sql += " ORDER BY created_at DESC";
+    const [rows] = await pool.query(sql, params);
+    res.json(rows);
+  } catch (err) {
+    console.error("GET /admin/banners", err);
+    res.status(500).json({ error: "Erro ao listar banners" });
+  }
+});
+
+// GET /admin/banners/:id
+router.get("/banners/:id", requireMaster, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const [rows] = await pool.query(
+      `SELECT id, city_id AS cityId, page, title, description, image_url AS imageUrl, link_url AS linkUrl,
+       position, format, is_active AS isActive, start_date AS startDate, end_date AS endDate,
+       created_at AS createdAt, updated_at AS updatedAt FROM banners WHERE id = ?`,
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ error: "Banner não encontrado" });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("GET /admin/banners/:id", err);
+    res.status(500).json({ error: "Erro ao buscar banner" });
+  }
+});
+
+// POST /admin/banners
+router.post("/banners", requireMaster, async (req, res) => {
+  try {
+    const { cityId, page, title, description, imageUrl, linkUrl, position, format, startDate, endDate } = req.body || {};
+    if (!title?.trim() || !imageUrl?.trim()) {
+      return res.status(400).json({ error: "Título e imagem são obrigatórios" });
+    }
+    const [result] = await pool.query(
+      `INSERT INTO banners (city_id, page, title, description, image_url, link_url, position, format, start_date, end_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        cityId != null && cityId !== "" ? parseInt(cityId, 10) : null,
+        page === "guia_comercial" ? "guia_comercial" : "home",
+        title.trim(),
+        description?.trim() || null,
+        imageUrl.trim(),
+        linkUrl?.trim() || null,
+        position === "middle" ? "middle" : position === "bottom" ? "bottom" : "top",
+        format === "vertical" ? "vertical" : "horizontal",
+        startDate?.trim() || null,
+        endDate?.trim() || null,
+      ]
+    );
+    const [rows] = await pool.query(
+      `SELECT id, city_id AS cityId, page, title, description, image_url AS imageUrl, link_url AS linkUrl,
+       position, format, is_active AS isActive, start_date AS startDate, end_date AS endDate,
+       created_at AS createdAt, updated_at AS updatedAt FROM banners WHERE id = ?`,
+      [result.insertId]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error("POST /admin/banners", err);
+    res.status(500).json({ error: "Erro ao criar banner" });
+  }
+});
+
+// PUT /admin/banners/:id
+router.put("/banners/:id", requireMaster, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { page, title, description, imageUrl, linkUrl, position, format, isActive, startDate, endDate } = req.body || {};
+    const [existentes] = await pool.query("SELECT id FROM banners WHERE id = ?", [id]);
+    if (!existentes.length) return res.status(404).json({ error: "Banner não encontrado" });
+
+    await pool.query(
+      `UPDATE banners SET page = ?, title = ?, description = ?, image_url = ?, link_url = ?, position = ?, format = ?, is_active = ?, start_date = ?, end_date = ? WHERE id = ?`,
+      [
+        page === "guia_comercial" ? "guia_comercial" : "home",
+        title ?? "",
+        description ?? null,
+        imageUrl ?? null,
+        linkUrl ?? null,
+        position === "middle" ? "middle" : position === "bottom" ? "bottom" : "top",
+        format === "vertical" ? "vertical" : "horizontal",
+        isActive !== 0 && isActive !== false ? 1 : 0,
+        startDate?.trim() || null,
+        endDate?.trim() || null,
+        id,
+      ]
+    );
+    const [rows] = await pool.query(
+      `SELECT id, city_id AS cityId, page, title, description, image_url AS imageUrl, link_url AS linkUrl,
+       position, format, is_active AS isActive, start_date AS startDate, end_date AS endDate,
+       created_at AS createdAt, updated_at AS updatedAt FROM banners WHERE id = ?`,
+      [id]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error("PUT /admin/banners/:id", err);
+    res.status(500).json({ error: "Erro ao atualizar banner" });
+  }
+});
+
+// PATCH /admin/banners/:id/ativo - toggle ativo
+router.patch("/banners/:id/ativo", requireMaster, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { ativo } = req.body ?? {};
+    const v = ativo !== false && ativo !== 0 ? 1 : 0;
+    await pool.query("UPDATE banners SET is_active = ? WHERE id = ?", [v, id]);
+    const [rows] = await pool.query("SELECT id, is_active AS isActive FROM banners WHERE id = ?", [id]);
+    if (!rows.length) return res.status(404).json({ error: "Banner não encontrado" });
+    res.json({ ativo: Boolean(rows[0].isActive) });
+  } catch (err) {
+    console.error("PATCH /admin/banners/:id/ativo", err);
+    res.status(500).json({ error: "Erro ao atualizar banner" });
+  }
+});
+
+// DELETE /admin/banners/:id
+router.delete("/banners/:id", requireMaster, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const [r] = await pool.query("DELETE FROM banners WHERE id = ?", [id]);
+    if (r.affectedRows === 0) return res.status(404).json({ error: "Banner não encontrado" });
+    res.status(204).send();
+  } catch (err) {
+    console.error("DELETE /admin/banners/:id", err);
+    res.status(500).json({ error: "Erro ao excluir banner" });
+  }
+});
+
 export default router;

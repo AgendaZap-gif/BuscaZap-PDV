@@ -46,6 +46,17 @@ export default function Layout() {
             >
               Eventos
             </Link>
+            <Link
+              to="/banners"
+              style={{
+                color: loc.pathname === "/banners" ? "#93c5fd" : "#e2e8f0",
+                padding: "0.35rem 0.75rem",
+                borderRadius: "6px",
+                textDecoration: "none",
+              }}
+            >
+              Banners
+            </Link>
           </nav>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>

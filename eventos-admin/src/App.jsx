@@ -7,6 +7,7 @@ import ExpositorArea from "./pages/ExpositorArea";
 import Dashboard from "./pages/Dashboard";
 import Eventos from "./pages/Eventos";
 import EventoForm from "./pages/EventoForm";
+import Banners from "./pages/Banners";
 import Expositores from "./pages/Expositores";
 import ExpositorForm from "./pages/ExpositorForm";
 import MapaEditor from "./pages/MapaEditor";
@@ -44,6 +45,7 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="eventos" element={<Eventos />} />
+          <Route path="banners" element={<Banners />} />
           <Route path="eventos/novo" element={<EventoForm />} />
           <Route path="eventos/:id/editar" element={<EventoForm />} />
           <Route path="eventos/:id/expositores" element={<Expositores />} />

@@ -20,3 +20,13 @@ mysql -u user -p database_name < migrations/001_add_mapa_largura_altura.sql
 ```
 
 Se aparecer "Duplicate column name", a coluna já existe; pode ignorar.
+
+## 003_banners_publicitarios.sql
+
+**Quando usar:** para usar a tela "Banners" no painel eventos-admin (banners publicitários da Home / Guia comercial).
+
+**Como rodar:** execute o conteúdo do arquivo no MySQL (Railway → Query ou local):
+
+```bash
+mysql -u user -p database_name < migrations/003_banners_publicitarios.sql
+```

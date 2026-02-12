@@ -134,4 +134,20 @@ export const createExpositorKnowledgeArquivo = (data) =>
 export const deleteExpositorKnowledge = (id) =>
   api.delete(`/expositor/knowledge/${id}`);
 
+// Banners publicitários (Home / Guia comercial)
+export const listBanners = (params = {}) => {
+  const q = new URLSearchParams();
+  if (params.cityId != null) q.set("cityId", params.cityId);
+  if (params.page) q.set("page", params.page);
+  if (params.includeInactive === true) q.set("includeInactive", "true");
+  const query = q.toString();
+  return api.get(`/admin/banners${query ? `?${query}` : ""}`).then((r) => r.data);
+};
+export const getBanner = (id) => api.get(`/admin/banners/${id}`).then((r) => r.data);
+export const createBanner = (data) => api.post("/admin/banners", data).then((r) => r.data);
+export const updateBanner = (id, data) => api.put(`/admin/banners/${id}`, data).then((r) => r.data);
+export const deleteBanner = (id) => api.delete(`/admin/banners/${id}`);
+export const toggleBannerAtivo = (id, ativo) =>
+  api.patch(`/admin/banners/${id}/ativo`, { ativo }).then((r) => r.data);
+
 export default api;
