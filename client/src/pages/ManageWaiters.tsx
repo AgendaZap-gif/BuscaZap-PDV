@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,13 +19,17 @@ import { UserPlus, Trash2 } from "lucide-react";
 
 export default function ManageWaiters() {
   const { toast } = useToast();
-  const [companyId] = useState<number>(1); // TODO: Pegar do contexto (SelectCompany)
+  const { user } = useAuth();
+  const companyId = user?.companyId ?? user?.id ?? 0;
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
 
-  const { data: waiters, isLoading, refetch } = trpc.waiters.list.useQuery({ companyId });
+  const { data: waiters, isLoading, refetch } = trpc.waiters.list.useQuery(
+    { companyId },
+    { enabled: companyId > 0 }
+  );
 
   const createWaiterMutation = trpc.waiters.create.useMutation({
     onSuccess: () => {
@@ -77,6 +82,14 @@ export default function ManageWaiters() {
       });
       return;
     }
+    if (companyId <= 0) {
+      toast({
+        title: "Empresa não identificada",
+        description: "Selecione uma empresa antes de cadastrar garçons.",
+        variant: "destructive",
+      });
+      return;
+    }
     createWaiterMutation.mutate({
       companyId,
       email: email.trim().toLowerCase(),
@@ -87,6 +100,7 @@ export default function ManageWaiters() {
 
   const handleRemove = (waiterId: number) => {
     if (!confirm("Desvincular este garçom da empresa? Ele não poderá mais acessar pelo app.")) return;
+    if (companyId <= 0) return;
     removeWaiterMutation.mutate({ companyId, waiterId });
   };
 
