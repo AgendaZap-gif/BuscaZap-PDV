@@ -8,6 +8,10 @@ import {
   listBannerImagens,
   deleteBannerImagem,
   uploadBannerImagensBulk,
+  listQuestionarioPerguntas,
+  createQuestionarioPergunta,
+  updateQuestionarioPergunta,
+  deleteQuestionarioPergunta,
 } from "../services/api";
 import QRCodeExport from "../components/QRCodeExport";
 
@@ -36,6 +40,10 @@ export default function EventoForm() {
   const [anexoMapaId, setAnexoMapaId] = useState(null);
   const [bannerImagens, setBannerImagens] = useState([]);
   const [uploadingBanners, setUploadingBanners] = useState(false);
+  const [questionarioPerguntas, setQuestionarioPerguntas] = useState([]);
+  const [loadingPerguntas, setLoadingPerguntas] = useState(false);
+  const [editingPerguntaId, setEditingPerguntaId] = useState(null);
+  const [novaPergunta, setNovaPergunta] = useState({ pergunta: "", opcoes: "" });
 
   useEffect(() => {
     if (!isEdit) {
@@ -60,6 +68,15 @@ export default function EventoForm() {
       })
       .catch(() => setForm((f) => f))
       .finally(() => setLoading(false));
+  }, [id, isEdit]);
+
+  useEffect(() => {
+    if (!isEdit || !id) return;
+    setLoadingPerguntas(true);
+    listQuestionarioPerguntas(id)
+      .then(setQuestionarioPerguntas)
+      .catch(() => setQuestionarioPerguntas([]))
+      .finally(() => setLoadingPerguntas(false));
   }, [id, isEdit]);
 
   const handleChange = (field, value) => {
@@ -117,6 +134,68 @@ export default function EventoForm() {
     try {
       await deleteBannerImagem(id, imageId);
       setBannerImagens((prev) => prev.filter((img) => img.id !== imageId));
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao remover.");
+    }
+  };
+
+  const opcoesFromString = (s) =>
+    (s || "")
+      .split(/[\n,]+/)
+      .map((o) => o.trim())
+      .filter(Boolean);
+  const opcoesToString = (arr) => (Array.isArray(arr) ? arr.join("\n") : "");
+
+  const handleAddPergunta = async () => {
+    if (!id || !novaPergunta.pergunta.trim()) {
+      alert("Digite a pergunta.");
+      return;
+    }
+    const opcoes = opcoesFromString(novaPergunta.opcoes);
+    if (opcoes.length === 0) {
+      alert("Informe ao menos uma opção (uma por linha ou separadas por vírgula).");
+      return;
+    }
+    try {
+      const created = await createQuestionarioPergunta(id, {
+        pergunta: novaPergunta.pergunta.trim(),
+        opcoes,
+      });
+      setQuestionarioPerguntas((prev) => [...prev, created].sort((a, b) => a.ordem - b.ordem));
+      setNovaPergunta({ pergunta: "", opcoes: "" });
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao adicionar pergunta.");
+    }
+  };
+
+  const handleSavePergunta = async (perguntaId, pergunta, opcoes) => {
+    if (!id) return;
+    const opcoesArr = Array.isArray(opcoes) ? opcoes : opcoesFromString(opcoes);
+    if (opcoesArr.length === 0) {
+      alert("Informe ao menos uma opção.");
+      return;
+    }
+    try {
+      const updated = await updateQuestionarioPergunta(id, perguntaId, {
+        pergunta: (pergunta || "").trim(),
+        opcoes: opcoesArr,
+      });
+      setQuestionarioPerguntas((prev) =>
+        prev.map((p) => (p.id === perguntaId ? updated : p))
+      );
+      setEditingPerguntaId(null);
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao salvar pergunta.");
+    }
+  };
+
+  const handleDeletePergunta = async (perguntaId) => {
+    if (!id) return;
+    if (!confirm("Remover esta pergunta da pesquisa?")) return;
+    try {
+      await deleteQuestionarioPergunta(id, perguntaId);
+      setQuestionarioPerguntas((prev) => prev.filter((p) => p.id !== perguntaId));
+      setEditingPerguntaId(null);
     } catch (err) {
       alert(err.response?.data?.error || "Erro ao remover.");
     }
@@ -371,6 +450,99 @@ export default function EventoForm() {
             />
             <label style={{ margin: 0 }}>Evento ativo</label>
           </div>
+
+          {isEdit && (
+            <div className="form-group" style={{ marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid #e2e8f0" }}>
+              <label>Pesquisa rápida (questionário)</label>
+              <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.75rem" }}>
+                Perguntas que o visitante responde uma vez por dia para acessar o mapa, promoções e área social. Se não definir nenhuma, o app usa a pesquisa fixa (ex.: visitante/estudante, cidade). Adicione perguntas com múltipla escolha.
+              </p>
+              {loadingPerguntas ? (
+                <p style={{ fontSize: "0.9rem", color: "#64748b" }}>Carregando perguntas...</p>
+              ) : (
+                <>
+                  <ul style={{ listStyle: "none", padding: 0, margin: "0 0 1rem 0" }}>
+                    {questionarioPerguntas.map((p) => (
+                      <li
+                        key={p.id}
+                        style={{
+                          marginBottom: "0.75rem",
+                          padding: "0.75rem",
+                          background: "#f8fafc",
+                          borderRadius: 8,
+                          border: "1px solid #e2e8f0",
+                        }}
+                      >
+                        {editingPerguntaId === p.id ? (
+                          <div>
+                            <input
+                              type="text"
+                              defaultValue={p.pergunta}
+                              id={`edit-pergunta-${p.id}`}
+                              placeholder="Texto da pergunta"
+                              style={{ width: "100%", marginBottom: "0.5rem", padding: "0.35rem 0.5rem" }}
+                            />
+                            <textarea
+                              id={`edit-opcoes-${p.id}`}
+                              defaultValue={opcoesToString(p.opcoes)}
+                              placeholder="Uma opção por linha"
+                              rows={2}
+                              style={{ width: "100%", marginBottom: "0.5rem", padding: "0.35rem 0.5rem", resize: "vertical" }}
+                            />
+                            <div style={{ display: "flex", gap: "0.5rem" }}>
+                              <button type="button" className="btn btn-primary" onClick={() => handleSavePergunta(p.id, document.getElementById(`edit-pergunta-${p.id}`)?.value, document.getElementById(`edit-opcoes-${p.id}`)?.value)}>
+                                Salvar
+                              </button>
+                              <button type="button" className="btn btn-secondary" onClick={() => setEditingPerguntaId(null)}>
+                                Cancelar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.5rem" }}>
+                            <div>
+                              <strong>{p.pergunta}</strong>
+                              <div style={{ fontSize: "0.85rem", color: "#64748b", marginTop: "0.25rem" }}>
+                                {Array.isArray(p.opcoes) ? p.opcoes.join(" · ") : opcoesToString(p.opcoes)}
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", gap: "0.35rem" }}>
+                              <button type="button" className="btn btn-secondary" style={{ padding: "0.25rem 0.5rem", fontSize: "0.85rem" }} onClick={() => setEditingPerguntaId(p.id)}>
+                                Editar
+                              </button>
+                              <button type="button" className="btn btn-secondary" style={{ padding: "0.25rem 0.5rem", fontSize: "0.85rem" }} onClick={() => handleDeletePergunta(p.id)}>
+                                Excluir
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <div style={{ marginTop: "0.5rem" }}>
+                    <input
+                      type="text"
+                      value={novaPergunta.pergunta}
+                      onChange={(e) => setNovaPergunta((prev) => ({ ...prev, pergunta: e.target.value }))}
+                      placeholder="Nova pergunta (ex.: Você é?)"
+                      style={{ width: "100%", marginBottom: "0.35rem", padding: "0.35rem 0.5rem" }}
+                    />
+                    <textarea
+                      value={novaPergunta.opcoes}
+                      onChange={(e) => setNovaPergunta((prev) => ({ ...prev, opcoes: e.target.value }))}
+                      placeholder="Opções, uma por linha (ex.: Visitante&#10;Estudante)"
+                      rows={2}
+                      style={{ width: "100%", marginBottom: "0.35rem", padding: "0.35rem 0.5rem", resize: "vertical" }}
+                    />
+                    <button type="button" className="btn btn-primary" onClick={handleAddPergunta}>
+                      Adicionar pergunta
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.5rem" }}>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? "Salvando..." : "Salvar"}

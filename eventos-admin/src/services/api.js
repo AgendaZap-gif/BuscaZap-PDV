@@ -73,6 +73,16 @@ export const uploadBannerImagensBulk = (eventoId, files) => {
 export const toggleAtivoEvento = (id, ativo) =>
   api.patch(`/admin/eventos/${id}/ativo`, { ativo }).then((r) => r.data);
 
+// Pesquisa rápida (questionário) do evento — perguntas que o visitante responde antes de ver mapa/comentários
+export const listQuestionarioPerguntas = (eventoId) =>
+  api.get(`/admin/eventos/${eventoId}/questionario-perguntas`).then((r) => r.data);
+export const createQuestionarioPergunta = (eventoId, data) =>
+  api.post(`/admin/eventos/${eventoId}/questionario-perguntas`, data).then((r) => r.data);
+export const updateQuestionarioPergunta = (eventoId, perguntaId, data) =>
+  api.put(`/admin/eventos/${eventoId}/questionario-perguntas/${perguntaId}`, data).then((r) => r.data);
+export const deleteQuestionarioPergunta = (eventoId, perguntaId) =>
+  api.delete(`/admin/eventos/${eventoId}/questionario-perguntas/${perguntaId}`);
+
 // Expositores
 export const listExpositores = (eventoId) =>
   api.get(`/admin/eventos/${eventoId}/expositores`).then((r) => r.data);
