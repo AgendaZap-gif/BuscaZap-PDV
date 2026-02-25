@@ -757,6 +757,33 @@ export const appRouter = router({
       }),
   }),
 
+  // Perfil de acesso da empresa (fonte: API do app BuscaZap – nova estrutura + fallback plano)
+  permissions: router({
+    getAccessProfile: protectedProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const baseUrl = ENV.buscazapAppApiUrl?.replace(/\/$/, "");
+        if (!baseUrl) return null;
+        const url = `${baseUrl}/api/trpc/permissions.accessProfile?input=${encodeURIComponent(JSON.stringify({ json: { companyId: input.companyId } }))}`;
+        const headers: Record<string, string> = {
+          Accept: "application/json",
+        };
+        const auth = ctx.req.headers.authorization;
+        if (auth) headers.Authorization = auth;
+        const cookie = ctx.req.headers.cookie;
+        if (cookie) headers.Cookie = cookie;
+        try {
+          const res = await fetch(url, { headers, credentials: "include" });
+          if (!res.ok) return null;
+          const data = await res.json();
+          const result = data?.result?.data?.json ?? data?.json ?? null;
+          return result as Record<string, unknown> | null;
+        } catch {
+          return null;
+        }
+      }),
+  }),
+
   // ==================== COMPANIES ====================
   companies: router({
     /** Lista empresas apenas por busca por nome (admin global). Não retorna todas para não pesar. */

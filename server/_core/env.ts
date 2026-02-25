@@ -29,4 +29,6 @@ export const ENV = {
   agendaWebhookSecret: process.env.AGENDA_WEBHOOK_SECRET ?? "",
   // Microserviço de eventos/feira (buscazap-eventos-service)
   eventosServiceUrl: process.env.EVENTOS_SERVICE_URL ?? "",
+  // API do app BuscaZap (para consumir permissions.accessProfile e outras rotas do app)
+  buscazapAppApiUrl: process.env.BUSCAZAP_APP_API_URL ?? "",
 };

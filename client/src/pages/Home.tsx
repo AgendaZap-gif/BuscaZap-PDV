@@ -3,12 +3,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getLoginUrl, getSiteSecretariaUrl } from "@/const";
+import { trpc } from "@/lib/trpc";
 import { ChefHat, CreditCard, LayoutGrid, Package, TrendingUp, UtensilsCrossed, Smartphone, Star, Bike, Users, UserPlus, LogOut } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
 
 export default function Home() {
   const { user, loading, isAuthenticated, logout } = useAuth();
+  const companyId = user?.companyId ?? (user as { id?: number })?.id ?? 0;
+  const { data: accessProfile } = trpc.permissions.getAccessProfile.useQuery(
+    { companyId },
+    { enabled: isAuthenticated && companyId > 0 }
+  );
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -152,91 +158,20 @@ export default function Home() {
   }
 
   const modes = [
-    {
-      title: "Gestão de Mesas",
-      description: "Visualizar e gerenciar mesas do restaurante",
-      icon: LayoutGrid,
-      path: "/tables",
-      color: "bg-blue-500",
-    },
-    {
-      title: "Modo Garçom",
-      description: "Atender mesas e fazer pedidos",
-      icon: UtensilsCrossed,
-      path: "/waiter",
-      color: "bg-green-500",
-    },
-    {
-      title: "Tela de Cozinha",
-      description: "Visualizar pedidos em preparo",
-      icon: ChefHat,
-      path: "/kitchen",
-      color: "bg-orange-500",
-    },
-    {
-      title: "PDV Caixa",
-      description: "Realizar pagamentos e fechar contas",
-      icon: CreditCard,
-      path: "/cashier",
-      color: "bg-purple-500",
-    },
-    {
-      title: "Relatórios",
-      description: "Dashboard e relatórios de vendas",
-      icon: TrendingUp,
-      path: "/reports",
-      color: "bg-red-500",
-    },
-    {
-      title: "Produtos",
-      description: "Gerenciar cardápio e produtos",
-      icon: Package,
-      path: "/products",
-      color: "bg-indigo-500",
-    },
-    {
-      title: "Pedidos BuscaZap",
-      description: "Receber e gerenciar pedidos do app",
-      icon: Smartphone,
-      path: "/buscazap-orders",
-      color: "bg-amber-500",
-    },
-    {
-      title: "Estatísticas BuscaZap",
-      description: "Análise de desempenho e métricas",
-      icon: TrendingUp,
-      path: "/buscazap-stats",
-      color: "bg-purple-500",
-    },
-    {
-      title: "Avaliações",
-      description: "Feedback dos clientes",
-      icon: Star,
-      path: "/ratings",
-      color: "bg-yellow-500",
-    },
-    {
-      title: "Controle de Delivery",
-      description: "Gerenciar status online do PediJá",
-      icon: Bike,
-      path: "/delivery-control",
-      color: "bg-green-600",
-    },
-    {
-      title: "Entregadores Próprios",
-      description: "Gerenciar entregadores exclusivos",
-      icon: Users,
-      path: "/manage-drivers",
-      color: "bg-blue-600",
-    },
-    {
-      title: "Gestão de Garçons",
-      description: "Criar login e senha para garçons usarem no app",
-      icon: UserPlus,
-      path: "/manage-waiters",
-      color: "bg-emerald-600",
-    },
+    { title: "Gestão de Mesas", description: "Visualizar e gerenciar mesas do restaurante", icon: LayoutGrid, path: "/tables", color: "bg-blue-500", allow: () => true },
+    { title: "Modo Garçom", description: "Atender mesas e fazer pedidos", icon: UtensilsCrossed, path: "/waiter", color: "bg-green-500", allow: () => true },
+    { title: "Tela de Cozinha", description: "Visualizar pedidos em preparo", icon: ChefHat, path: "/kitchen", color: "bg-orange-500", allow: () => true },
+    { title: "PDV Caixa", description: "Realizar pagamentos e fechar contas", icon: CreditCard, path: "/cashier", color: "bg-purple-500", allow: (p: typeof accessProfile) => p == null || (p as { canUsePDV?: boolean })?.canUsePDV !== false },
+    { title: "Relatórios", description: "Dashboard e relatórios de vendas", icon: TrendingUp, path: "/reports", color: "bg-red-500", allow: (p: typeof accessProfile) => p == null || (p as { canViewAnalytics?: boolean })?.canViewAnalytics !== false },
+    { title: "Produtos", description: "Gerenciar cardápio e produtos", icon: Package, path: "/products", color: "bg-indigo-500", allow: (p: typeof accessProfile) => p == null || (p as { canManageMenu?: boolean })?.canManageMenu !== false },
+    { title: "Pedidos BuscaZap", description: "Receber e gerenciar pedidos do app", icon: Smartphone, path: "/buscazap-orders", color: "bg-amber-500", allow: (p: typeof accessProfile) => p == null || (p as { canUsePedija?: boolean })?.canUsePedija !== false },
+    { title: "Estatísticas BuscaZap", description: "Análise de desempenho e métricas", icon: TrendingUp, path: "/buscazap-stats", color: "bg-purple-500", allow: (p: typeof accessProfile) => p == null || (p as { canViewAnalytics?: boolean })?.canViewAnalytics !== false },
+    { title: "Avaliações", description: "Feedback dos clientes", icon: Star, path: "/ratings", color: "bg-yellow-500", allow: () => true },
+    { title: "Controle de Delivery", description: "Gerenciar status online do PediJá", icon: Bike, path: "/delivery-control", color: "bg-green-600", allow: (p: typeof accessProfile) => p == null || (p as { canUsePedija?: boolean })?.canUsePedija !== false },
+    { title: "Entregadores Próprios", description: "Gerenciar entregadores exclusivos", icon: Users, path: "/manage-drivers", color: "bg-blue-600", allow: (p: typeof accessProfile) => p == null || (p as { canUseOwnDriverModule?: boolean })?.canUseOwnDriverModule !== false },
+    { title: "Gestão de Garçons", description: "Criar login e senha para garçons usarem no app", icon: UserPlus, path: "/manage-waiters", color: "bg-emerald-600", allow: () => true },
   ];
+  const visibleModes = modes.filter((m) => m.allow(accessProfile ?? undefined));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -249,7 +184,7 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {modes.map((mode) => (
+          {visibleModes.map((mode) => (
             <Card
               key={mode.path}
               className="cursor-pointer hover:shadow-lg transition-shadow"
