@@ -788,6 +788,8 @@ export const notificationQueue = mysqlTable("notification_queue", {
 export type NotificationQueue = typeof notificationQueue.$inferSelect;
 export type InsertNotificationQueue = typeof notificationQueue.$inferInsert;
 
+// ==================== CONFIGURAÇÃO GLOBAL / CIDADES ====================
+
 // ==================== AGENDA (Secretária - clínicas, hospitais, comércios) ====================
 
 /** Planos de saúde / particular por empresa */
