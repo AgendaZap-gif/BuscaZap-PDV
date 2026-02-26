@@ -14,5 +14,5 @@ export const getSiteSecretariaUrl = () => {
   if (typeof window !== "undefined" && window.location?.origin) {
     return `${window.location.origin}/secretaria/agenda`;
   }
-  return "https://www.buscazapbrasil.com.br/secretaria/agenda";
+  return "https://pdv.buscazapbrasil.com.br/secretaria/agenda";
 };

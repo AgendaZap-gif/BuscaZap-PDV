@@ -1,5 +1,7 @@
 # eventos.buscazapbrasil.com.br = eventos-admin (painel)
 
+**Importante:** Não use `www.` no início. Use somente **pdv.buscazapbrasil.com.br** e **eventos.buscazapbrasil.com.br**.
+
 ## Sim: o painel é o “root” desse domínio
 
 O domínio **eventos.buscazapbrasil.com.br** deve abrir o **eventos-admin** (painel web React), **não** o eventos-service (API).
