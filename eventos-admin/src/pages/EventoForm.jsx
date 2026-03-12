@@ -115,27 +115,38 @@ export default function EventoForm() {
 
   useEffect(() => {
     if (!isEdit) { setLoading(false); return; }
-    getEvento(id).then((e) => {
-      let prog = [];
-      try { prog = e.programacao ? (typeof e.programacao === "string" ? JSON.parse(e.programacao) : e.programacao) : []; if (!Array.isArray(prog)) prog = []; } catch { prog = []; }
-      setForm({
-        nome: e.nome || "", cidade: e.cidade || "", edicao: e.edicao || "",
-        descricao: e.descricao || "", categoria: e.categoria || "Agro",
-        dataInicio: e.dataInicio?.slice(0, 10) || "", dataFim: e.dataFim?.slice(0, 10) || "",
-        exibirAPartir: e.exibirAPartir ? String(e.exibirAPartir).slice(0, 10) : "",
-        ativo: e.ativo !== false,
-        bannerUrl: e.bannerUrl || "", mapaUrl: e.mapaUrl || "",
-        mapaLargura: e.mapaLargura ?? 800, mapaAltura: e.mapaAltura ?? 600,
-        numVisitantes: e.numVisitantes || "", numExpositores: e.numExpositores || "",
-        whatsappOrganizador: e.whatsappOrganizador || "", emailOrganizador: e.emailOrganizador || "",
-        siteOficial: e.siteOficial || "", instagram: e.instagram || "",
-        facebook: e.facebook || "", youtube: e.youtube || "",
-        ingressoUrl: e.ingressoUrl || "", precoEntrada: e.precoEntrada || "",
-        programacao: prog,
-        expositorContato: e.expositorContato || "", expositorContatoTipo: e.expositorContatoTipo || "whatsapp",
-      });
-      setBannerImagens(e.bannerImagens || []);
-    }).catch(() => {}).finally(() => setLoading(false));
+    const loadData = async () => {
+      try {
+        const e = await getEvento(id);
+        let prog = [];
+        try { prog = e.programacao ? (typeof e.programacao === "string" ? JSON.parse(e.programacao) : e.programacao) : []; if (!Array.isArray(prog)) prog = []; } catch { prog = []; }
+        setForm({
+          nome: e.nome || "", cidade: e.cidade || "", edicao: e.edicao || "",
+          descricao: e.descricao || "", categoria: e.categoria || "Agro",
+          dataInicio: e.dataInicio?.slice(0, 10) || "", dataFim: e.dataFim?.slice(0, 10) || "",
+          exibirAPartir: e.exibirAPartir ? String(e.exibirAPartir).slice(0, 10) : "",
+          ativo: e.ativo !== false,
+          bannerUrl: e.bannerUrl || "", mapaUrl: e.mapaUrl || "",
+          mapaLargura: e.mapaLargura ?? 800, mapaAltura: e.mapaAltura ?? 600,
+          numVisitantes: e.numVisitantes || "", numExpositores: e.numExpositores || "",
+          whatsappOrganizador: e.whatsappOrganizador || "", emailOrganizador: e.emailOrganizador || "",
+          siteOficial: e.siteOficial || "", instagram: e.instagram || "",
+          facebook: e.facebook || "", youtube: e.youtube || "",
+          ingressoUrl: e.ingressoUrl || "", precoEntrada: e.precoEntrada || "",
+          programacao: prog,
+          expositorContato: e.expositorContato || "", expositorContatoTipo: e.expositorContatoTipo || "whatsapp",
+        });
+        
+        // Buscar imagens do carrossel separadamente para garantir que estão atualizadas
+        const imgs = await listBannerImagens(id);
+        setBannerImagens(imgs || []);
+      } catch (err) {
+        console.error("Erro ao carregar evento:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, [id, isEdit]);
 
   useEffect(() => {
@@ -154,8 +165,10 @@ export default function EventoForm() {
     try {
       const data = await uploadEventoImage(file, tipo, isEdit ? id : null);
       set(field, data.url);
-      if (data.anexoId) { field === "bannerUrl" ? setAnexoBannerId(data.anexoId) : setAnexoMapaId(data.anexoId); }
-      else { field === "bannerUrl" ? setAnexoBannerId(null) : setAnexoMapaId(null); }
+      if (data.anexoId) {
+        if (field === "bannerUrl") setAnexoBannerId(data.anexoId);
+        else setAnexoMapaId(data.anexoId);
+      }
     } catch (err) { alert(err.response?.data?.error || "Erro ao enviar imagem."); }
     finally { setU(false); }
   };
@@ -222,9 +235,10 @@ export default function EventoForm() {
     try {
       const payload = { ...form };
       if (!isEdit) {
-        if (anexoBannerId) payload.anexoBannerId = anexoBannerId;
-        if (anexoMapaId) payload.anexoMapaId = anexoMapaId;
-        await createEvento(payload);
+        const payloadPost = { ...payload };
+        if (anexoBannerId) payloadPost.anexoBannerId = anexoBannerId;
+        if (anexoMapaId) payloadPost.anexoMapaId = anexoMapaId;
+        await createEvento(payloadPost);
         alert("Evento criado com sucesso!");
       } else {
         await updateEvento(id, payload);

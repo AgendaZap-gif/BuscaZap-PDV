@@ -74,8 +74,14 @@ export default function ExpositorForm() {
     const setters = { logoUrl: setUploadingLogo, imagemTituloUrl: setUploadingTitulo, bannerUrl: setUploadingBanner };
     setters[field](true);
     try {
+      // Para expositores, usamos a rota de upload que gera anexo temporário (sem eventoId direto)
+      // O backend identifica tipos expositor-* e salva em anexo_temp
       const data = await uploadEventoImage(file, tipo);
       setForm((prev) => ({ ...prev, [field]: data.url }));
+      
+      // Armazenar o ID do anexo temporário para vincular ao salvar o formulário
+      const anexoField = field === "logoUrl" ? "anexoLogoId" : field === "imagemTituloUrl" ? "anexoTituloId" : "anexoBannerId";
+      setForm((prev) => ({ ...prev, [anexoField]: data.anexoId }));
     } catch (err) {
       alert(err.response?.data?.error || "Erro ao enviar imagem.");
     } finally {
@@ -94,6 +100,10 @@ export default function ExpositorForm() {
         email: form.login?.trim() || null,
       };
       delete payload.login;
+      
+      // Se houver anexoId (de um upload recente), o backend usará para persistir a imagem
+      // Se não houver, o backend usará a URL ou manterá a imagem atual
+      
       if (isEdit && payload.senha === "") delete payload.senha;
       if (isEdit) {
         await updateExpositor(id, payload);
