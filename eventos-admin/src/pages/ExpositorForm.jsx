@@ -287,29 +287,34 @@ export default function ExpositorForm() {
             </div>
           )}
 
-          <hr style={{ margin: "1.25rem 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
-          <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>Acesso do expositor (área própria)</h3>
-          <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "0.75rem" }}>Com login e senha o expositor pode acessar a área dele e fazer upload das próprias imagens (logo e título).</p>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Email (login do expositor)</label>
-              <input
-                type="email"
-                value={form.login}
-                onChange={(e) => handleChange("login", e.target.value)}
-                placeholder="ex: empresa@email.com"
-                autoComplete="username"
-              />
-            </div>
-            <div className="form-group">
-              <label>{isEdit ? "Nova senha (deixe em branco para não alterar)" : "Senha"}</label>
-              <input
-                type="password"
-                value={form.senha}
-                onChange={(e) => handleChange("senha", e.target.value)}
-                placeholder={isEdit ? "••••••••" : "Mín. 6 caracteres"}
-                autoComplete={isEdit ? "new-password" : "new-password"}
-              />
+          <div className="card-section" style={{ marginTop: "1.5rem" }}>
+            <h3 className="section-title">Acesso do Expositor</h3>
+            <p className="form-hint" style={{ marginBottom: "1rem" }}>
+              Defina as credenciais para que o expositor possa acessar sua própria área e gerenciar suas fotos e informações.
+            </p>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Email / Login</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={form.login}
+                  onChange={(e) => handleChange("login", e.target.value)}
+                  placeholder="empresa@email.com"
+                  autoComplete="username"
+                />
+              </div>
+              <div className="form-group">
+                <label>{isEdit ? "Nova Senha (opcional)" : "Senha *"}</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  value={form.senha}
+                  onChange={(e) => handleChange("senha", e.target.value)}
+                  placeholder={isEdit ? "Deixe em branco para manter" : "Mínimo 6 caracteres"}
+                  autoComplete="new-password"
+                />
+              </div>
             </div>
           </div>
 
