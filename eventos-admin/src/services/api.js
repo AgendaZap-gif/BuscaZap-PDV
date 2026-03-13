@@ -112,6 +112,18 @@ export const uploadExpositorArquivo = (file, { tipo = "catalogo", titulo } = {})
   return api.post(`/expositor/arquivos/upload?${q}`, formData).then((r) => r.data);
 };
 
+export const uploadExpositorCatalogo = (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api.post("/expositor/catalogo/upload", formData).then((r) => r.data);
+};
+
+export const uploadExpositorFotoEvento = (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api.post("/expositor/fotos-evento", formData).then((r) => r.data);
+};
+
 export const listExpositorArquivos = () =>
   api.get("/expositor/arquivos").then((r) => r.data);
 

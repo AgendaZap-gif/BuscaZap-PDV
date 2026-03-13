@@ -38,6 +38,8 @@ export default function ExpositorArea() {
   const [cards, setCards] = useState([]);
   const [knowledge, setKnowledge] = useState([]);
   const [uploadingArquivo, setUploadingArquivo] = useState(false);
+  const [uploadingCatalogo, setUploadingCatalogo] = useState(false);
+  const [uploadingFotoEvento, setUploadingFotoEvento] = useState(false);
   const [creatingCard, setCreatingCard] = useState(false);
   const [creatingTexto, setCreatingTexto] = useState(false);
   const [creatingFromFile, setCreatingFromFile] = useState(false);
@@ -129,6 +131,36 @@ export default function ExpositorArea() {
       alert(err.response?.data?.error || "Erro ao enviar arquivo.");
     } finally {
       setUploadingArquivo(false);
+    }
+  };
+
+  const handleUploadCatalogo = async (file) => {
+    if (!file) return;
+    setUploadingCatalogo(true);
+    try {
+      const res = await uploadExpositorCatalogo(file);
+      alert(res.message || "Catálogo processado com sucesso.");
+      loadArquivos();
+      loadCards();
+      loadKnowledge();
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao enviar catálogo.");
+    } finally {
+      setUploadingCatalogo(false);
+    }
+  };
+
+  const handleUploadFotoEvento = async (file) => {
+    if (!file) return;
+    setUploadingFotoEvento(true);
+    try {
+      await uploadExpositorFotoEvento(file);
+      alert("Foto do evento adicionada com sucesso.");
+      loadArquivos();
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao enviar foto.");
+    } finally {
+      setUploadingFotoEvento(false);
     }
   };
 
@@ -421,9 +453,8 @@ export default function ExpositorArea() {
             <div className="card">
               <h2 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>Catálogos e arquivos</h2>
               <p style={{ color: "#64748b", fontSize: "0.85rem", marginBottom: "0.75rem" }}>
-                Envie PDFs, apresentações ou imagens. Eles podem ser exibidos na sua página e usados para treinar o bot.
-              </p>
-              <div className="form-group">
+                Envie PDFs, apresentações ou imagens. Eles podem ser exibidos na sua página e usa              <div className="form-group">
+                <label>Enviar novo arquivo (PDF ou Imagem)</label>
                 <input
                   type="file"
                   disabled={uploadingArquivo}
@@ -437,7 +468,46 @@ export default function ExpositorArea() {
                   <span style={{ fontSize: "0.85rem", color: "#64748b" }}> Enviando...</span>
                 )}
               </div>
-              {arquivos.length > 0 && (
+
+              <div className="form-group" style={{ marginTop: "1rem", padding: "1rem", background: "#f0f9ff", borderRadius: "8px", border: "1px solid #bae6fd" }}>
+                <label style={{ color: "#0369a1", fontWeight: "bold" }}>📂 Upload de Catálogo (IA)</label>
+                <p style={{ fontSize: "0.75rem", color: "#0c4a6e", marginBottom: "0.5rem" }}>
+                  Envie seu catálogo em PDF ou Imagens. O sistema extrairá os produtos e treinará o bot automaticamente.
+                </p>
+                <input
+                  type="file"
+                  accept="application/pdf,image/*"
+                  disabled={uploadingCatalogo}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUploadCatalogo(f);
+                    e.target.value = "";
+                  }}
+                />
+                {uploadingCatalogo && (
+                  <span style={{ fontSize: "0.85rem", color: "#0369a1" }}> Processando Catálogo com IA...</span>
+                )}
+              </div>
+
+              <div className="form-group" style={{ marginTop: "1rem", padding: "1rem", background: "#f0fdf4", borderRadius: "8px", border: "1px solid #bbf7d0" }}>
+                <label style={{ color: "#15803d", fontWeight: "bold" }}>📸 Fotos do Evento</label>
+                <p style={{ fontSize: "0.75rem", color: "#14532d", marginBottom: "0.5rem" }}>
+                  Poste fotos dos dias do evento para os visitantes verem em tempo real.
+                </p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={uploadingFotoEvento}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUploadFotoEvento(f);
+                    e.target.value = "";
+                  }}
+                />
+                {uploadingFotoEvento && (
+                  <span style={{ fontSize: "0.85rem", color: "#15803d" }}> Enviando Foto...</span>
+                )}
+              </div>.length > 0 && (
                 <ul style={{ listStyle: "none", padding: 0, marginTop: "0.75rem", maxHeight: 200, overflowY: "auto" }}>
                   {arquivos.map((arq) => (
                     <li
