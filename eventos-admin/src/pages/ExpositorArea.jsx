@@ -453,7 +453,9 @@ export default function ExpositorArea() {
             <div className="card">
               <h2 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>Catálogos e arquivos</h2>
               <p style={{ color: "#64748b", fontSize: "0.85rem", marginBottom: "0.75rem" }}>
-                Envie PDFs, apresentações ou imagens. Eles podem ser exibidos na sua página e usa              <div className="form-group">
+                Envie PDFs, apresentações ou imagens. Eles podem ser exibidos na sua página e usados pelo bot para responder visitantes.
+              </p>
+              <div className="form-group">
                 <label>Enviar novo arquivo (PDF ou Imagem)</label>
                 <input
                   type="file"
@@ -507,7 +509,8 @@ export default function ExpositorArea() {
                 {uploadingFotoEvento && (
                   <span style={{ fontSize: "0.85rem", color: "#15803d" }}> Enviando Foto...</span>
                 )}
-              </div>.length > 0 && (
+              </div>
+              {arquivos.length > 0 && (
                 <ul style={{ listStyle: "none", padding: 0, marginTop: "0.75rem", maxHeight: 200, overflowY: "auto" }}>
                   {arquivos.map((arq) => (
                     <li
