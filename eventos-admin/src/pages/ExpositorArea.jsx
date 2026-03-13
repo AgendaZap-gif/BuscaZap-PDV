@@ -61,7 +61,10 @@ export default function ExpositorArea() {
           linkedin: d.linkedin || "",
         });
       })
-      .catch(() => setData(null))
+      .catch((err) => {
+        console.error("Erro ao carregar dados do expositor:", err);
+        setData(null);
+      })
       .finally(() => setLoading(false));
   };
 
