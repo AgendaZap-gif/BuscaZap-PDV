@@ -55,7 +55,7 @@ export default function ExpositorForm() {
           logoUrl: e.logoUrl || "",
           imagemTituloUrl: e.imagemTituloUrl || "",
           bannerUrl: e.bannerUrl || "",
-          login: e.email || "",
+          login: e.email || e.login || "",
           senha: "",
         });
       }
