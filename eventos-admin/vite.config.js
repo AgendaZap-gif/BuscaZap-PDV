@@ -13,4 +13,10 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    // Railway injeta PORT via variável de ambiente
+    port: parseInt(process.env.PORT || "3000", 10),
+    host: "0.0.0.0",
+    allowedHosts: "all",
+  },
 });
