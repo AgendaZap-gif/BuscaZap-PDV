@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { clearCompanyAuth } from "./AdminLogin";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Users, Brain, Megaphone, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Brain, Megaphone, LogOut, Zap, Building2 } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [path] = useLocation();
@@ -16,6 +16,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/leads", label: "Leads", icon: Users },
     { href: "/admin/training", label: "Treinar IA", icon: Brain },
     { href: "/admin/promotions", label: "Promoções", icon: Megaphone },
+    { href: "/admin/planos", label: "Planos & Add-ons", icon: Zap },
+    { href: "/admin/perfil", label: "Perfil da Empresa", icon: Building2 },
   ];
 
   return (

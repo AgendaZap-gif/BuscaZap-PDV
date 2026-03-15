@@ -31,6 +31,8 @@ import {
   crmContacts,
   userBehavior,
   notificationQueue,
+  upsellCatalog,
+  companyUpsells,
   type Company,
   type Table,
   type Category,
@@ -2791,4 +2793,69 @@ export async function addCompanyKnowledge(
     isActive: true,
   });
   return row.insertId;
+}
+
+// ============================================================
+// Upsells — funções de banco de dados
+// ============================================================
+
+/** Lista todos os upsells do catálogo (ativos). */
+export async function listUpsellCatalog() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(upsellCatalog).where(eq(upsellCatalog.isActive, true)).orderBy(upsellCatalog.sortOrder);
+}
+
+/** Lista os upsells ativos de uma empresa. */
+export async function getCompanyUpsells(companyId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(companyUpsells).where(
+    and(eq(companyUpsells.companyId, companyId), eq(companyUpsells.status, "active"))
+  );
+}
+
+/** Verifica se uma empresa tem um upsell específico ativo. */
+export async function companyHasUpsell(companyId: number, slug: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db.select({ id: companyUpsells.id }).from(companyUpsells).where(
+    and(
+      eq(companyUpsells.companyId, companyId),
+      eq(companyUpsells.upsellSlug, slug),
+      eq(companyUpsells.status, "active")
+    )
+  ).limit(1);
+  return rows.length > 0;
+}
+
+/** Ativa (ou reativa) um upsell para uma empresa. */
+export async function activateCompanyUpsell(companyId: number, slug: string, pricePaid: number = 0) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Upsert: se já existe, reativa; se não, cria
+  const existing = await db.select().from(companyUpsells).where(
+    and(eq(companyUpsells.companyId, companyId), eq(companyUpsells.upsellSlug, slug))
+  ).limit(1);
+  if (existing.length > 0) {
+    await db.update(companyUpsells)
+      .set({ status: "active", pricePaid: String(pricePaid), activatedAt: new Date(), cancelledAt: null })
+      .where(and(eq(companyUpsells.companyId, companyId), eq(companyUpsells.upsellSlug, slug)));
+  } else {
+    await db.insert(companyUpsells).values({
+      companyId,
+      upsellSlug: slug,
+      status: "active",
+      pricePaid: String(pricePaid),
+    });
+  }
+}
+
+/** Cancela um upsell de uma empresa. */
+export async function cancelCompanyUpsell(companyId: number, slug: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(companyUpsells)
+    .set({ status: "cancelled", cancelledAt: new Date() })
+    .where(and(eq(companyUpsells.companyId, companyId), eq(companyUpsells.upsellSlug, slug)));
 }

@@ -809,9 +809,25 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return await db.getCompanyById(input.id);
       }),
-  }),
 
-  // ==================== WAITERS (GARÇONS) ====================
+    /**
+     * Perfil público da empresa com features/upsells ativos.
+     * Usado pelo app BuscaZap para exibir o perfil completo da empresa.
+     */
+    getPublicProfile: publicProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const company = await db.getCompanyById(input.id);
+        if (!company) return null;
+        const activeUpsells = await db.getCompanyUpsells(input.id);
+        const features = activeUpsells.reduce((acc, u) => {
+          acc[u.upsellSlug] = true;
+          return acc;
+        }, {} as Record<string, boolean>);
+        return { ...company, features };
+      }),
+  }),
+  // ==================== WAITERS (GARÇONS) =====================
   waiters: router({
     list: protectedProcedure
       .input(z.object({ companyId: z.number() }))
@@ -2202,6 +2218,54 @@ export const appRouter = router({
           hasOwnDrivers: false,
           maxDrivers: 0,
         });
+      }),
+  }),
+
+  // ==================== UPSELLS ====================
+  upsells: router({
+    /** Lista o catálogo completo de upsells disponíveis. */
+    catalog: publicProcedure.query(async () => {
+      return db.listUpsellCatalog();
+    }),
+
+    /** Lista os upsells ativos de uma empresa (para o painel da empresa). */
+    list: companyProcedure
+      .input(z.object({ companyId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado." });
+        const active = await db.getCompanyUpsells(input.companyId);
+        const catalog = await db.listUpsellCatalog();
+        // Retorna catálogo enriquecido com status de contratação
+        return catalog.map((item) => ({
+          ...item,
+          contracted: active.some((u) => u.upsellSlug === item.slug),
+        }));
+      }),
+
+    /** Ativa um upsell para uma empresa (admin global ou pela própria empresa). */
+    activate: companyProcedure
+      .input(z.object({ companyId: z.number(), slug: z.string(), pricePaid: z.number().optional() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado." });
+        await db.activateCompanyUpsell(input.companyId, input.slug, input.pricePaid ?? 0);
+        return { success: true };
+      }),
+
+    /** Cancela um upsell de uma empresa. */
+    cancel: companyProcedure
+      .input(z.object({ companyId: z.number(), slug: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        if (ctx.companyId !== input.companyId) throw new TRPCError({ code: "FORBIDDEN", message: "Acesso negado." });
+        await db.cancelCompanyUpsell(input.companyId, input.slug);
+        return { success: true };
+      }),
+
+    /** Verifica se uma empresa tem um upsell específico ativo (uso público para o app). */
+    check: publicProcedure
+      .input(z.object({ companyId: z.number(), slug: z.string() }))
+      .query(async ({ input }) => {
+        const has = await db.companyHasUpsell(input.companyId, input.slug);
+        return { active: has };
       }),
   }),
 

@@ -16,6 +16,8 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminLeads from "./pages/AdminLeads";
 import AdminTraining from "./pages/AdminTraining";
 import AdminPromotions from "./pages/AdminPromotions";
+import AdminPlanos from "./pages/AdminPlanos";
+import AdminPerfil from "./pages/AdminPerfil";
 import AdminLayout from "./pages/AdminLayout";
 import Order from "./pages/Order";
 import Waiter from "./pages/Waiter";
@@ -72,6 +74,16 @@ function Router() {
       <Route path="/admin/promotions">
         <AdminLayout>
           <AdminPromotions />
+        </AdminLayout>
+      </Route>
+      <Route path="/admin/planos">
+        <AdminLayout>
+          <AdminPlanos />
+        </AdminLayout>
+      </Route>
+      <Route path="/admin/perfil">
+        <AdminLayout>
+          <AdminPerfil />
         </AdminLayout>
       </Route>
       <Route path="/admin" component={() => <AdminLayout><AdminDashboard /></AdminLayout>} />

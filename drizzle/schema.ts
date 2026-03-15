@@ -875,3 +875,42 @@ export const agendaAppointments = mysqlTable("agenda_appointments", {
 
 export type AgendaAppointment = typeof agendaAppointments.$inferSelect;
 export type InsertAgendaAppointment = typeof agendaAppointments.$inferInsert;
+
+// ============================================================
+// Upsells — Sistema de funcionalidades adicionais por empresa
+// ============================================================
+
+/**
+ * Catálogo global de upsells disponíveis para contratação.
+ */
+export const upsellCatalog = mysqlTable("upsell_catalog", {
+  id: int("id").autoincrement().primaryKey(),
+  slug: varchar("slug", { length: 80 }).notNull().unique(),
+  name: varchar("name", { length: 120 }).notNull(),
+  description: text("description"),
+  priceMonthly: decimal("price_monthly", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type UpsellCatalog = typeof upsellCatalog.$inferSelect;
+export type InsertUpsellCatalog = typeof upsellCatalog.$inferInsert;
+
+/**
+ * Upsells contratados por empresa.
+ */
+export const companyUpsells = mysqlTable("company_upsells", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("company_id").notNull(),
+  upsellSlug: varchar("upsell_slug", { length: 80 }).notNull(),
+  status: mysqlEnum("status", ["active", "cancelled", "expired", "pending"]).default("active").notNull(),
+  pricePaid: decimal("price_paid", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  activatedAt: timestamp("activated_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type CompanyUpsell = typeof companyUpsells.$inferSelect;
+export type InsertCompanyUpsell = typeof companyUpsells.$inferInsert;
