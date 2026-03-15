@@ -156,6 +156,16 @@ export const createExpositorKnowledgeArquivo = (data) =>
 export const deleteExpositorKnowledge = (id) =>
   api.delete(`/expositor/knowledge/${id}`);
 
+// Vídeos do expositor
+export const listExpositorVideos = () =>
+  api.get("/expositor/videos").then((r) => r.data);
+export const createExpositorVideo = (data) =>
+  api.post("/expositor/videos", data).then((r) => r.data);
+export const updateExpositorVideo = (id, data) =>
+  api.put(`/expositor/videos/${id}`, data).then((r) => r.data);
+export const deleteExpositorVideo = (id) =>
+  api.delete(`/expositor/videos/${id}`);
+
 // Banners publicitários (Home / Guia comercial)
 export const listBanners = (params = {}) => {
   const q = new URLSearchParams();

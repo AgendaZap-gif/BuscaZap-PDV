@@ -13,6 +13,11 @@ import {
   createExpositorKnowledgeTexto,
   createExpositorKnowledgeArquivo,
   deleteExpositorKnowledge,
+  listExpositorVideos,
+  createExpositorVideo,
+  deleteExpositorVideo,
+  uploadExpositorCatalogo,
+  uploadExpositorFotoEvento,
 } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -30,22 +35,31 @@ export default function ExpositorArea() {
     bannerUrl: "",
     descricao: "",
     site: "",
+    whatsapp: "",
+    telefone: "",
     instagram: "",
     linkedin: "",
+    facebook: "",
+    youtube: "",
+    horarioAbertura: "",
+    horarioFechamento: "",
   });
 
   const [arquivos, setArquivos] = useState([]);
   const [cards, setCards] = useState([]);
   const [knowledge, setKnowledge] = useState([]);
+  const [videos, setVideos] = useState([]);
   const [uploadingArquivo, setUploadingArquivo] = useState(false);
   const [uploadingCatalogo, setUploadingCatalogo] = useState(false);
   const [uploadingFotoEvento, setUploadingFotoEvento] = useState(false);
   const [creatingCard, setCreatingCard] = useState(false);
   const [creatingTexto, setCreatingTexto] = useState(false);
   const [creatingFromFile, setCreatingFromFile] = useState(false);
+  const [creatingVideo, setCreatingVideo] = useState(false);
   const [cardForm, setCardForm] = useState({ titulo: "", descricao: "", arquivoId: "" });
   const [textoForm, setTextoForm] = useState({ titulo: "", conteudo: "" });
   const [arquivoKnowledgeId, setArquivoKnowledgeId] = useState("");
+  const [videoForm, setVideoForm] = useState({ titulo: "", url: "", tipo: "youtube" });
 
   const load = () => {
     getExpositorMe()
@@ -57,8 +71,14 @@ export default function ExpositorArea() {
           bannerUrl: d.bannerUrl || "",
           descricao: d.descricao || "",
           site: d.site || "",
+          whatsapp: d.whatsapp || "",
+          telefone: d.telefone || "",
           instagram: d.instagram || "",
           linkedin: d.linkedin || "",
+          facebook: d.facebook || "",
+          youtube: d.youtube || "",
+          horarioAbertura: d.horarioAbertura ? String(d.horarioAbertura).substring(0, 5) : "",
+          horarioFechamento: d.horarioFechamento ? String(d.horarioFechamento).substring(0, 5) : "",
         });
       })
       .catch((err) => {
@@ -86,11 +106,18 @@ export default function ExpositorArea() {
       .catch(() => setKnowledge([]));
   };
 
+  const loadVideos = () => {
+    listExpositorVideos()
+      .then(setVideos)
+      .catch(() => setVideos([]));
+  };
+
   useEffect(() => {
     load();
     loadArquivos();
     loadCards();
     loadKnowledge();
+    loadVideos();
   }, []);
 
   const handleUpload = async (field, tipo, file) => {
@@ -263,6 +290,38 @@ export default function ExpositorArea() {
     }
   };
 
+  const handleCreateVideo = async (e) => {
+    e.preventDefault();
+    if (!videoForm.titulo.trim() || !videoForm.url.trim()) {
+      alert("Informe o título e a URL do vídeo.");
+      return;
+    }
+    setCreatingVideo(true);
+    try {
+      await createExpositorVideo({
+        titulo: videoForm.titulo.trim(),
+        url: videoForm.url.trim(),
+        tipo: videoForm.tipo,
+      });
+      setVideoForm({ titulo: "", url: "", tipo: "youtube" });
+      loadVideos();
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao adicionar vídeo.");
+    } finally {
+      setCreatingVideo(false);
+    }
+  };
+
+  const handleDeleteVideo = async (id) => {
+    if (!window.confirm("Remover este vídeo?")) return;
+    try {
+      await deleteExpositorVideo(id);
+      loadVideos();
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao remover vídeo.");
+    }
+  };
+
   if (loading)
     return (
       <div className="container" style={{ padding: "2rem", textAlign: "center" }}>
@@ -424,6 +483,30 @@ export default function ExpositorArea() {
                   placeholder="https://suaempresa.com.br"
                 />
               </div>
+
+              <hr style={{ margin: "1.25rem 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+              <h2 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>Contato</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div className="form-group">
+                  <label>WhatsApp</label>
+                  <input
+                    value={form.whatsapp}
+                    onChange={(e) => setForm((prev) => ({ ...prev, whatsapp: e.target.value }))}
+                    placeholder="5511999999999"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Telefone</label>
+                  <input
+                    value={form.telefone}
+                    onChange={(e) => setForm((prev) => ({ ...prev, telefone: e.target.value }))}
+                    placeholder="(11) 3333-4444"
+                  />
+                </div>
+              </div>
+
+              <hr style={{ margin: "1.25rem 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+              <h2 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>Redes sociais</h2>
               <div className="form-group">
                 <label>Instagram</label>
                 <input
@@ -439,6 +522,43 @@ export default function ExpositorArea() {
                   onChange={(e) => setForm((prev) => ({ ...prev, linkedin: e.target.value }))}
                   placeholder="https://linkedin.com/company/suaempresa"
                 />
+              </div>
+              <div className="form-group">
+                <label>Facebook</label>
+                <input
+                  value={form.facebook}
+                  onChange={(e) => setForm((prev) => ({ ...prev, facebook: e.target.value }))}
+                  placeholder="https://facebook.com/suaempresa"
+                />
+              </div>
+              <div className="form-group">
+                <label>Canal do YouTube</label>
+                <input
+                  value={form.youtube}
+                  onChange={(e) => setForm((prev) => ({ ...prev, youtube: e.target.value }))}
+                  placeholder="https://youtube.com/@suaempresa"
+                />
+              </div>
+
+              <hr style={{ margin: "1.25rem 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+              <h2 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>Horário de funcionamento no estande</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div className="form-group">
+                  <label>Abertura</label>
+                  <input
+                    type="time"
+                    value={form.horarioAbertura}
+                    onChange={(e) => setForm((prev) => ({ ...prev, horarioAbertura: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Fechamento</label>
+                  <input
+                    type="time"
+                    value={form.horarioFechamento}
+                    onChange={(e) => setForm((prev) => ({ ...prev, horarioFechamento: e.target.value }))}
+                  />
+                </div>
               </div>
 
               <button
@@ -554,6 +674,96 @@ export default function ExpositorArea() {
               )}
               {arquivos.length === 0 && (
                 <p style={{ fontSize: "0.8rem", color: "#94a3b8" }}>Nenhum arquivo enviado ainda.</p>
+              )}
+            </div>
+
+            {/* Seção de Vídeos */}
+            <div className="card">
+              <h2 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>🎬 Vídeos</h2>
+              <p style={{ color: "#64748b", fontSize: "0.85rem", marginBottom: "0.75rem" }}>
+                Adicione links de vídeos do YouTube ou Vimeo para exibir na sua página na feira.
+              </p>
+              <form onSubmit={handleCreateVideo} style={{ marginBottom: "0.75rem" }}>
+                <div className="form-group">
+                  <label>Título do vídeo *</label>
+                  <input
+                    value={videoForm.titulo}
+                    onChange={(e) => setVideoForm((prev) => ({ ...prev, titulo: e.target.value }))}
+                    placeholder="Ex: Apresentação da empresa, Demonstração do produto"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>URL do vídeo *</label>
+                  <input
+                    value={videoForm.url}
+                    onChange={(e) => setVideoForm((prev) => ({ ...prev, url: e.target.value }))}
+                    placeholder="https://youtube.com/watch?v=..."
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Plataforma</label>
+                  <select
+                    value={videoForm.tipo}
+                    onChange={(e) => setVideoForm((prev) => ({ ...prev, tipo: e.target.value }))}
+                  >
+                    <option value="youtube">YouTube</option>
+                    <option value="vimeo">Vimeo</option>
+                    <option value="outro">Outro</option>
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm"
+                  disabled={creatingVideo}
+                >
+                  {creatingVideo ? "Adicionando..." : "Adicionar vídeo"}
+                </button>
+              </form>
+              {videos.length > 0 && (
+                <ul style={{ listStyle: "none", padding: 0, marginTop: "0.5rem", maxHeight: 200, overflowY: "auto" }}>
+                  {videos.map((v) => (
+                    <li
+                      key={v.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "0.5rem",
+                        padding: "0.25rem 0",
+                        borderBottom: "1px solid #e2e8f0",
+                        fontSize: "0.85rem",
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 500, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                          {v.titulo}
+                        </div>
+                        <div style={{ color: "#64748b", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+                          {v.url}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => window.open(v.url, "_blank")}
+                      >
+                        Abrir
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        onClick={() => handleDeleteVideo(v.id)}
+                      >
+                        Remover
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {videos.length === 0 && (
+                <p style={{ fontSize: "0.8rem", color: "#94a3b8" }}>Nenhum vídeo adicionado ainda.</p>
               )}
             </div>
 
