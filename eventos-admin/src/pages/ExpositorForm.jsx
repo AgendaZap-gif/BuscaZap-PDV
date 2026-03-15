@@ -17,8 +17,17 @@ export default function ExpositorForm() {
     nome: "",
     categoria: "",
     whatsapp: "",
+    telefone: "",
     estande: "",
     promocao: "",
+    descricao: "",
+    site: "",
+    instagram: "",
+    linkedin: "",
+    facebook: "",
+    youtube: "",
+    horarioAbertura: "",
+    horarioFechamento: "",
     destaque: false,
     patrocinado: false,
     posX: 0,
@@ -46,8 +55,17 @@ export default function ExpositorForm() {
           nome: e.nome || "",
           categoria: e.categoria || "",
           whatsapp: e.whatsapp || "",
+          telefone: e.telefone || "",
           estande: e.estande || "",
           promocao: e.promocao || "",
+          descricao: e.descricao || "",
+          site: e.site || "",
+          instagram: e.instagram || "",
+          linkedin: e.linkedin || "",
+          facebook: e.facebook || "",
+          youtube: e.youtube || "",
+          horarioAbertura: e.horarioAbertura || "",
+          horarioFechamento: e.horarioFechamento || "",
           destaque: Boolean(e.destaque),
           patrocinado: Boolean(e.patrocinado),
           posX: e.posX ?? 0,
@@ -162,14 +180,103 @@ export default function ExpositorForm() {
               />
             </div>
           </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>WhatsApp</label>
+              <input
+                value={form.whatsapp}
+                onChange={(e) => handleChange("whatsapp", e.target.value)}
+                placeholder="5566999999999"
+              />
+            </div>
+            <div className="form-group">
+              <label>Telefone</label>
+              <input
+                value={form.telefone}
+                onChange={(e) => handleChange("telefone", e.target.value)}
+                placeholder="(66) 3333-4444"
+              />
+            </div>
+          </div>
           <div className="form-group">
-            <label>WhatsApp</label>
-            <input
-              value={form.whatsapp}
-              onChange={(e) => handleChange("whatsapp", e.target.value)}
-              placeholder="5566999999999"
+            <label>Descrição da empresa</label>
+            <textarea
+              value={form.descricao}
+              onChange={(e) => handleChange("descricao", e.target.value)}
+              placeholder="Conte sobre a empresa, diferenciais e soluções..."
+              rows={3}
+              style={{ width: "100%", padding: "0.5rem", borderRadius: 6, border: "1px solid #e2e8f0", fontSize: "0.875rem", resize: "vertical" }}
             />
           </div>
+          <div className="form-group">
+            <label>Site</label>
+            <input
+              value={form.site}
+              onChange={(e) => handleChange("site", e.target.value)}
+              placeholder="https://suaempresa.com.br"
+            />
+          </div>
+
+          <hr style={{ margin: "1.25rem 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+          <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>Redes Sociais</h3>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Instagram</label>
+              <input
+                value={form.instagram}
+                onChange={(e) => handleChange("instagram", e.target.value)}
+                placeholder="https://instagram.com/suaempresa"
+              />
+            </div>
+            <div className="form-group">
+              <label>LinkedIn</label>
+              <input
+                value={form.linkedin}
+                onChange={(e) => handleChange("linkedin", e.target.value)}
+                placeholder="https://linkedin.com/company/suaempresa"
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Facebook</label>
+              <input
+                value={form.facebook}
+                onChange={(e) => handleChange("facebook", e.target.value)}
+                placeholder="https://facebook.com/suaempresa"
+              />
+            </div>
+            <div className="form-group">
+              <label>YouTube</label>
+              <input
+                value={form.youtube}
+                onChange={(e) => handleChange("youtube", e.target.value)}
+                placeholder="https://youtube.com/@suaempresa"
+              />
+            </div>
+          </div>
+
+          <hr style={{ margin: "1.25rem 0", border: "none", borderTop: "1px solid #e2e8f0" }} />
+          <h3 style={{ fontSize: "1rem", marginBottom: "0.75rem" }}>Horário de Funcionamento no Estande</h3>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Abertura</label>
+              <input
+                type="time"
+                value={form.horarioAbertura}
+                onChange={(e) => handleChange("horarioAbertura", e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label>Fechamento</label>
+              <input
+                type="time"
+                value={form.horarioFechamento}
+                onChange={(e) => handleChange("horarioFechamento", e.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="form-group">
             <label>Promoção</label>
             <input

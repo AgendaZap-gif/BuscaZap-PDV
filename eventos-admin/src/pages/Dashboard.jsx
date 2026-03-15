@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { listEventos } from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const isMaster = user?.role === "master" || user?.role === "admin_global";
   const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -17,8 +20,6 @@ export default function Dashboard() {
   const ativos = eventos.filter(
     (e) => e.ativo && e.dataInicio <= hoje && e.dataFim >= hoje
   );
-  const totalExpositores = eventos.reduce((acc, e) => acc + (e.expositoresCount ?? 0), 0);
-  // We don't have expositoresCount in list - could add to API later. For now show events count.
   const totalEventos = eventos.length;
 
   return (
@@ -50,9 +51,11 @@ export default function Dashboard() {
       <div className="card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
           <h2 style={{ margin: 0 }}>Eventos</h2>
-          <Link to="/eventos/novo" className="btn btn-primary">
-            ➕ Criar evento
-          </Link>
+          {isMaster && (
+            <Link to="/eventos/novo" className="btn btn-primary">
+              ➕ Criar evento
+            </Link>
+          )}
         </div>
         {loading ? (
           <p style={{ color: "#64748b" }}>Carregando...</p>

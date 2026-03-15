@@ -4,6 +4,10 @@ import { useAuth } from "../context/AuthContext";
 export default function Layout() {
   const { user, logout } = useAuth();
   const loc = useLocation();
+  const isMaster = user?.role === "master" || user?.role === "admin_global";
+  const isProdutor = user?.role === "produtor";
+  const roleLabel = isMaster ? "Admin Global" : isProdutor ? "Produtor" : user?.role ?? "";
+  const roleBadgeColor = isMaster ? "#FF8C42" : "#4ade80";
 
   const isActive = (path) => {
     if (path === "/") return loc.pathname === "/";
@@ -77,7 +81,10 @@ export default function Layout() {
           <nav style={{ display: "flex", gap: "0.25rem" }}>
             <Link to="/" style={navLinkStyle("/")}>Dashboard</Link>
             <Link to="/eventos" style={navLinkStyle("/eventos")}>Eventos</Link>
-            <Link to="/banners" style={navLinkStyle("/banners")}>Banners</Link>
+            {/* Banners só visível para admin global/master */}
+            {isMaster && (
+              <Link to="/banners" style={navLinkStyle("/banners")}>Banners</Link>
+            )}
           </nav>
         </div>
 
@@ -90,7 +97,7 @@ export default function Layout() {
                   width: 30,
                   height: 30,
                   borderRadius: "50%",
-                  background: "#FF8C42",
+                  background: roleBadgeColor,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -106,9 +113,9 @@ export default function Layout() {
                 <div style={{ fontSize: "0.8125rem", color: "#e2e8f0", fontWeight: "500" }}>
                   {user.email}
                 </div>
-                {user.role === "master" && (
-                  <div style={{ fontSize: "0.6875rem", color: "#FF8C42", fontWeight: "600" }}>
-                    Master
+                {roleLabel && (
+                  <div style={{ fontSize: "0.6875rem", color: roleBadgeColor, fontWeight: "600" }}>
+                    {roleLabel}
                   </div>
                 )}
               </div>
