@@ -48,18 +48,8 @@ CREATE TABLE IF NOT EXISTS company_upsells (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Adicionar colunas na tabela companies
-SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base');
-SET @sql = IF(@col_exists = 0, 'ALTER TABLE companies ADD COLUMN plan_base ENUM("free","basico","profissional","premium") NOT NULL DEFAULT "free"', 'SELECT "Column plan_base already exists"');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_price');
-SET @sql = IF(@col_exists = 0, 'ALTER TABLE companies ADD COLUMN plan_base_price DECIMAL(10,2) NOT NULL DEFAULT 0.00', 'SELECT "Column plan_base_price already exists"');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_activated_at');
-SET @sql = IF(@col_exists = 0, 'ALTER TABLE companies ADD COLUMN plan_base_activated_at TIMESTAMP NULL', 'SELECT "Column plan_base_activated_at already exists"');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
-
-SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_expires_at');
-SET @sql = IF(@col_exists = 0, 'ALTER TABLE companies ADD COLUMN plan_base_expires_at TIMESTAMP NULL', 'SELECT "Column plan_base_expires_at already exists"');
-PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+-- OBS: Se a coluna já existir, o MySQL retornará erro "Duplicate column", que pode ser ignorado.
+ALTER TABLE companies ADD COLUMN plan_base ENUM('free','basico','profissional','premium') NOT NULL DEFAULT 'free';
+ALTER TABLE companies ADD COLUMN plan_base_price DECIMAL(10,2) NOT NULL DEFAULT 0.00;
+ALTER TABLE companies ADD COLUMN plan_base_activated_at TIMESTAMP NULL;
+ALTER TABLE companies ADD COLUMN plan_base_expires_at TIMESTAMP NULL;
