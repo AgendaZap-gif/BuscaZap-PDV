@@ -52,12 +52,31 @@ CREATE TABLE IF NOT EXISTS company_upsells (
   CONSTRAINT fk_company_upsells_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Adicionar coluna planBase na tabela companies (plano base contratado)
-ALTER TABLE companies
-  ADD COLUMN IF NOT EXISTS plan_base ENUM('free','basico','profissional','premium') NOT NULL DEFAULT 'free',
-  ADD COLUMN IF NOT EXISTS plan_base_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-  ADD COLUMN IF NOT EXISTS plan_base_activated_at TIMESTAMP NULL,
-  ADD COLUMN IF NOT EXISTS plan_base_expires_at TIMESTAMP NULL;
+-- Adicionar colunas na tabela companies (plano base contratado)
+DROP PROCEDURE IF EXISTS AddCompanyPlanColumns;
+DELIMITER //
+CREATE PROCEDURE AddCompanyPlanColumns()
+BEGIN
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base') THEN
+        ALTER TABLE companies ADD COLUMN plan_base ENUM('free','basico','profissional','premium') NOT NULL DEFAULT 'free';
+    END IF;
+    
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_price') THEN
+        ALTER TABLE companies ADD COLUMN plan_base_price DECIMAL(10,2) NOT NULL DEFAULT 0.00;
+    END IF;
+    
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_activated_at') THEN
+        ALTER TABLE companies ADD COLUMN plan_base_activated_at TIMESTAMP NULL;
+    END IF;
+    
+    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_expires_at') THEN
+        ALTER TABLE companies ADD COLUMN plan_base_expires_at TIMESTAMP NULL;
+    END IF;
+END //
+DELIMITER ;
+
+CALL AddCompanyPlanColumns();
+DROP PROCEDURE AddCompanyPlanColumns;
 
 -- Verificação final
 SELECT
