@@ -1,15 +1,11 @@
 -- ============================================================
 -- Migration v17: Sistema de Upsells e Features por Empresa
 -- ============================================================
--- Execute no banco de dados de produção (Railway/MySQL)
--- Cada upsell é uma funcionalidade que a empresa pode contratar
--- separadamente ou em conjunto com o plano base.
--- ============================================================
 
--- Tabela de catálogo de upsells disponíveis (configuração global)
+-- Tabela de catálogo de upsells disponíveis
 CREATE TABLE IF NOT EXISTS upsell_catalog (
   id          INT AUTO_INCREMENT PRIMARY KEY,
-  slug        VARCHAR(80) NOT NULL UNIQUE,   -- identificador único: 'logo_card', 'chat_ai', etc.
+  slug        VARCHAR(80) NOT NULL UNIQUE,
   name        VARCHAR(120) NOT NULL,
   description TEXT,
   price_monthly DECIMAL(10,2) NOT NULL DEFAULT 0.00,
@@ -18,7 +14,7 @@ CREATE TABLE IF NOT EXISTS upsell_catalog (
   created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Upsells disponíveis (catálogo inicial)
+-- Upsells disponíveis
 INSERT IGNORE INTO upsell_catalog (slug, name, description, price_monthly, sort_order) VALUES
   ('logo_card',       'Logo no Card',           'Exibe a logo da empresa no card de busca do app.', 29.90, 10),
   ('imagem_perfil',   'Imagem no Perfil',        'Foto/banner de capa na página de perfil da empresa no app.', 19.90, 20),
@@ -48,39 +44,22 @@ CREATE TABLE IF NOT EXISTS company_upsells (
   updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY unique_company_upsell (company_id, upsell_slug),
   INDEX idx_company_upsells_company (company_id),
-  INDEX idx_company_upsells_status (company_id, status),
-  CONSTRAINT fk_company_upsells_company FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+  INDEX idx_company_upsells_status (company_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Adicionar colunas na tabela companies (plano base contratado)
-DROP PROCEDURE IF EXISTS AddCompanyPlanColumns;
-DELIMITER //
-CREATE PROCEDURE AddCompanyPlanColumns()
-BEGIN
-    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base') THEN
-        ALTER TABLE companies ADD COLUMN plan_base ENUM('free','basico','profissional','premium') NOT NULL DEFAULT 'free';
-    END IF;
-    
-    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_price') THEN
-        ALTER TABLE companies ADD COLUMN plan_base_price DECIMAL(10,2) NOT NULL DEFAULT 0.00;
-    END IF;
-    
-    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_activated_at') THEN
-        ALTER TABLE companies ADD COLUMN plan_base_activated_at TIMESTAMP NULL;
-    END IF;
-    
-    IF NOT EXISTS (SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_expires_at') THEN
-        ALTER TABLE companies ADD COLUMN plan_base_expires_at TIMESTAMP NULL;
-    END IF;
-END //
-DELIMITER ;
+-- Adicionar colunas na tabela companies
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE companies ADD COLUMN plan_base ENUM("free","basico","profissional","premium") NOT NULL DEFAULT "free"', 'SELECT "Column plan_base already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
-CALL AddCompanyPlanColumns();
-DROP PROCEDURE AddCompanyPlanColumns;
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_price');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE companies ADD COLUMN plan_base_price DECIMAL(10,2) NOT NULL DEFAULT 0.00', 'SELECT "Column plan_base_price already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
--- Verificação final
-SELECT
-  'Migration v17 aplicada!' AS status,
-  (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'upsell_catalog') AS tabela_catalog,
-  (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'company_upsells') AS tabela_upsells,
-  (SELECT COUNT(*) FROM upsell_catalog) AS upsells_cadastrados;
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_activated_at');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE companies ADD COLUMN plan_base_activated_at TIMESTAMP NULL', 'SELECT "Column plan_base_activated_at already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'companies' AND COLUMN_NAME = 'plan_base_expires_at');
+SET @sql = IF(@col_exists = 0, 'ALTER TABLE companies ADD COLUMN plan_base_expires_at TIMESTAMP NULL', 'SELECT "Column plan_base_expires_at already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
