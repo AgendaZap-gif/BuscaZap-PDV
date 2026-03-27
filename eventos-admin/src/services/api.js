@@ -41,6 +41,7 @@ export const listEventos = () => api.get("/admin/eventos").then((r) => r.data);
 export const getEvento = (id) => api.get(`/admin/eventos/${id}`).then((r) => r.data);
 export const createEvento = (data) => api.post("/admin/eventos", data).then((r) => r.data);
 export const updateEvento = (id, data) => api.put(`/admin/eventos/${id}`, data).then((r) => r.data);
+export const deleteEvento = (id) => api.delete(`/admin/eventos/${id}`);
 
 /** Upload de imagem (banner ou mapa). tipo = "banner" | "mapa"; eventoId = opcional.
  *  Para banner com eventoId: adiciona ao carrossel e retorna { url, bannerImageId }. */

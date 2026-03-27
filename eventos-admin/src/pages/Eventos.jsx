@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { listEventos, toggleAtivoEvento } from "../services/api";
+import { deleteEvento, listEventos, toggleAtivoEvento } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 export default function Eventos() {
@@ -25,6 +25,18 @@ export default function Eventos() {
       load();
     } catch (e) {
       alert(e.response?.data?.error || "Erro ao atualizar");
+    }
+  };
+
+  const handleDelete = async (id, nome) => {
+    if (user?.role !== "master") return;
+    const ok = window.confirm(`Tem certeza que deseja excluir o evento "${nome}"?`);
+    if (!ok) return;
+    try {
+      await deleteEvento(id);
+      load();
+    } catch (e) {
+      alert(e.response?.data?.error || "Erro ao excluir evento");
     }
   };
 
@@ -88,6 +100,16 @@ export default function Eventos() {
                       <Link to={`/eventos/${e.id}/mapa`} className="btn btn-sm btn-primary">
                         Abrir mapa
                       </Link>
+                      {user?.role === "master" && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger"
+                          style={{ marginLeft: "0.5rem" }}
+                          onClick={() => handleDelete(e.id, e.nome)}
+                        >
+                          Excluir
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
