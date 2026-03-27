@@ -16,10 +16,22 @@ export async function generateDailySummary(companyId: number, date: Date): Promi
   const endOfDay = new Date(date);
   endOfDay.setHours(23, 59, 59, 999);
 
-  const convs = await drizzleDb
-    .select()
-    .from(conversations)
-    .where(and(eq(conversations.companyId, companyId), gte(conversations.lastMessageAt, startOfDay)));
+  let convs: Array<typeof conversations.$inferSelect> = [];
+  try {
+    convs = await drizzleDb
+      .select()
+      .from(conversations)
+      .where(and(eq(conversations.companyId, companyId), gte(conversations.lastMessageAt, startOfDay)));
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code;
+    if (code === "ER_NO_SUCH_TABLE") {
+      // Banco ainda não recebeu migrações das tabelas de IA (conversations/messages/crm_contacts, etc.)
+      throw new Error(
+        "Daily summary indisponível: tabela `conversations` não existe no banco. Rode as migrações do Drizzle no ambiente (drizzle-kit migrate)."
+      );
+    }
+    throw err;
+  }
 
   const lines: string[] = [];
   lines.push(`Resumo do dia ${date.toLocaleDateString("pt-BR")}`);
