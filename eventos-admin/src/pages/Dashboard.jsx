@@ -24,7 +24,7 @@ export default function Dashboard() {
 
   return (
     <div className="container">
-      <h1 style={{ marginBottom: "1rem" }}>Dashboard</h1>
+      <h1 style={{ marginBottom: "1rem" }}>Dashboard — Feiras</h1>
 
       <div
         style={{
@@ -35,13 +35,13 @@ export default function Dashboard() {
         }}
       >
         <div className="card" style={{ marginBottom: 0 }}>
-          <div style={{ color: "#64748b", fontSize: "0.875rem" }}>Eventos ativos (hoje)</div>
+          <div style={{ color: "#64748b", fontSize: "0.875rem" }}>Feiras ativas (hoje)</div>
           <div style={{ fontSize: "2rem", fontWeight: "700", color: "#16a34a" }}>
             {loading ? "..." : ativos.length}
           </div>
         </div>
         <div className="card" style={{ marginBottom: 0 }}>
-          <div style={{ color: "#64748b", fontSize: "0.875rem" }}>Total de eventos</div>
+          <div style={{ color: "#64748b", fontSize: "0.875rem" }}>Total de feiras</div>
           <div style={{ fontSize: "2rem", fontWeight: "700" }}>
             {loading ? "..." : totalEventos}
           </div>
@@ -50,17 +50,17 @@ export default function Dashboard() {
 
       <div className="card">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
-          <h2 style={{ margin: 0 }}>Eventos</h2>
+          <h2 style={{ margin: 0 }}>Suas feiras</h2>
           {isMaster && (
             <Link to="/eventos/novo" className="btn btn-primary">
-              ➕ Criar evento
+              ➕ Nova feira
             </Link>
           )}
         </div>
         {loading ? (
           <p style={{ color: "#64748b" }}>Carregando...</p>
         ) : eventos.length === 0 ? (
-          <p style={{ color: "#64748b" }}>Nenhum evento. Crie o primeiro!</p>
+          <p style={{ color: "#64748b" }}>Nenhuma feira. Crie a primeira!</p>
         ) : (
           <table style={{ marginTop: "1rem" }}>
             <thead>

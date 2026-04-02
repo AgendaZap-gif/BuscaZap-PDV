@@ -45,9 +45,13 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="eventos" element={<Eventos />} />
+          {/* Alias: quem procura "feiras" cai na mesma tela e formulário */}
+          <Route path="feiras" element={<Eventos />} />
           <Route path="banners" element={<Banners />} />
           <Route path="eventos/novo" element={<EventoForm />} />
+          <Route path="feiras/novo" element={<EventoForm />} />
           <Route path="eventos/:id/editar" element={<EventoForm />} />
+          <Route path="feiras/:id/editar" element={<EventoForm />} />
           <Route path="eventos/:id/expositores" element={<Expositores />} />
           <Route path="eventos/:eventoId/expositores/novo" element={<ExpositorForm />} />
           <Route path="eventos/:eventoId/expositores/:id/editar" element={<ExpositorForm />} />

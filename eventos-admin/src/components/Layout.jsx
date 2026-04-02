@@ -11,6 +11,9 @@ export default function Layout() {
 
   const isActive = (path) => {
     if (path === "/") return loc.pathname === "/";
+    if (path === "/eventos") {
+      return loc.pathname.startsWith("/eventos") || loc.pathname.startsWith("/feiras");
+    }
     return loc.pathname.startsWith(path);
   };
 
@@ -80,7 +83,7 @@ export default function Layout() {
 
           <nav style={{ display: "flex", gap: "0.25rem" }}>
             <Link to="/" style={navLinkStyle("/")}>Dashboard</Link>
-            <Link to="/eventos" style={navLinkStyle("/eventos")}>Eventos</Link>
+            <Link to="/eventos" style={navLinkStyle("/eventos")}>Feiras</Link>
             {/* Banners só visível para admin global/master */}
             {isMaster && (
               <Link to="/banners" style={navLinkStyle("/banners")}>Banners</Link>

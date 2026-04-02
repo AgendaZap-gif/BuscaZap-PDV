@@ -94,6 +94,7 @@ export default function EventoForm() {
   const [form, setForm] = useState({
     nome: "", cidade: "", edicao: "", descricao: "", categoria: "Agro",
     dataInicio: "", dataFim: "", exibirAPartir: "", ativo: true,
+    latitude: "", longitude: "",
     bannerUrl: "", mapaUrl: "", mapaLargura: 800, mapaAltura: 600,
     numVisitantes: "", numExpositores: "",
     whatsappOrganizador: "", emailOrganizador: "", siteOficial: "",
@@ -126,6 +127,8 @@ export default function EventoForm() {
           dataInicio: e.dataInicio?.slice(0, 10) || "", dataFim: e.dataFim?.slice(0, 10) || "",
           exibirAPartir: e.exibirAPartir ? String(e.exibirAPartir).slice(0, 10) : "",
           ativo: e.ativo !== false,
+          latitude: e.latitude != null && e.latitude !== "" ? String(e.latitude) : "",
+          longitude: e.longitude != null && e.longitude !== "" ? String(e.longitude) : "",
           bannerUrl: e.bannerUrl || "", mapaUrl: e.mapaUrl || "",
           mapaLargura: e.mapaLargura ?? 800, mapaAltura: e.mapaAltura ?? 600,
           numVisitantes: e.numVisitantes || "", numExpositores: e.numExpositores || "",
@@ -238,13 +241,16 @@ export default function EventoForm() {
         const payloadPost = { ...payload };
         if (anexoBannerId) payloadPost.anexoBannerId = anexoBannerId;
         if (anexoMapaId) payloadPost.anexoMapaId = anexoMapaId;
-        await createEvento(payloadPost);
-        alert("Evento criado com sucesso!");
+        const criado = await createEvento(payloadPost);
+        const novoId = criado?.id;
+        alert("Feira criada com sucesso! Continue com mídia, questionário e expositores.");
+        if (novoId) navigate(`/eventos/${novoId}/editar`);
+        else navigate("/eventos");
       } else {
         await updateEvento(id, payload);
-        alert("Evento atualizado com sucesso!");
+        alert("Feira atualizada com sucesso!");
+        navigate("/eventos");
       }
-      navigate("/eventos");
     } catch (err) { alert(err.response?.data?.error || "Erro ao salvar."); }
     finally { setSaving(false); }
   };
@@ -254,7 +260,7 @@ export default function EventoForm() {
   const SaveBtn = () => (
     <div style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
       <button type="submit" disabled={saving} style={{ ...S.btnPrimary, opacity: saving ? 0.6 : 1, cursor: saving ? "not-allowed" : "pointer" }}>
-        {saving ? "Salvando..." : isEdit ? "💾 Salvar alterações" : "✅ Criar evento"}
+        {saving ? "Salvando..." : isEdit ? "💾 Salvar alterações" : "✅ Criar feira"}
       </button>
       <button type="button" onClick={() => navigate("/eventos")} style={S.btnSecondary}>Cancelar</button>
     </div>
@@ -266,9 +272,13 @@ export default function EventoForm() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: "1.375rem", fontWeight: 800, color: "#101828" }}>
-            {isEdit ? "✏️ Editar evento" : "➕ Novo evento"}
+            {isEdit ? "✏️ Editar feira" : "➕ Nova feira"}
           </h1>
-          {isEdit && form.nome && <p style={{ margin: "0.2rem 0 0", fontSize: "0.875rem", color: "#667085" }}>{form.nome}</p>}
+          <p style={{ margin: "0.35rem 0 0", fontSize: "0.8125rem", color: "#667085", maxWidth: 520 }}>
+            {isEdit
+              ? "Esta feira aparece no app BuscaZap em Eventos (com mapa, lista e expositores)."
+              : "Cadastre nome, cidade e datas; depois envie banner, mapa, cadastre expositores e posicione no mapa."}
+          </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "#fff", border: "1px solid #e4e7ec", borderRadius: 8, padding: "0.4rem 0.75rem" }}>
