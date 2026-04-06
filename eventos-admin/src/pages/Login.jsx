@@ -40,8 +40,10 @@ export default function Login() {
         <h1 style={{ marginTop: 0, marginBottom: "0.5rem", fontSize: "1.5rem" }}>
           🎪 Eventos Admin
         </h1>
-        <p style={{ color: "#64748b", marginBottom: "1.5rem", fontSize: "0.875rem" }}>
-          Painel BuscaZap Feira da Cidade
+        <p style={{ color: "#64748b", marginBottom: "1.5rem", fontSize: "0.875rem", lineHeight: 1.45 }}>
+          Painel do produtor de feira: use <strong style={{ color: "#475569" }}>eventos.buscazapbrasil.com.br</strong>.
+          O <strong style={{ color: "#475569" }}>PDV</strong> (pdv.buscazapbrasil.com.br) é só o restaurante. Dados e
+          login vêm da API do <strong style={{ color: "#475569" }}>buscazap-eventos-service</strong>.
         </p>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
