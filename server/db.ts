@@ -1,51 +1,12 @@
-import { eq, and, asc, desc, isNull, gte, lte, ne, sql, inArray, like } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import bcrypt from "bcryptjs";
-import { nanoid } from "nanoid";
-import {
-  InsertUser,
-  users,
-  companies,
-  tables,
-  categories,
-  products,
-  orders,
-  orderItems,
-  paymentMethods,
-  payments,
-  cashRegisters,
-  cashMovements,
-  cashClosures,
-  printers,
-  billSplits,
-  deliveryRequests,
-  chatMessages,
-  orderRatings,
-  companyDeliverySettings,
-  companyDrivers,
-  externalPlatformIntegrations,
-  conversations,
-  messages,
-  companyKnowledgeBase,
-  companyAiSettings,
-  crmContacts,
-  userBehavior,
-  notificationQueue,
-  upsellCatalog,
-  companyUpsells,
-  type Company,
-  type Table,
-  type Category,
-  type Product,
-  type Order,
-  type OrderItem,
-  type PaymentMethod,
-  type CashRegister,
-} from "../drizzle/schema";
-import { ENV } from "./_core/env";
+import { InsertUser, users, sellers, Seller, InsertSeller, products, InsertProduct, customers, Customer, InsertCustomer, orders, Order, InsertOrder, orderItems, OrderItem, stock, Stock, transactions, Transaction, pedijaOrders, InsertPedijaOrder, PedijaOrder } from "../drizzle/schema";
+import { ENV } from './_core/env';
+import { BusinessType } from "../shared/businessTypes";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
+// Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -57,8 +18,6 @@ export async function getDb() {
   }
   return _db;
 }
-
-// ==================== AUTH ====================
 
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
@@ -98,16 +57,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       values.role = user.role;
       updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
-      values.role = "admin";
-      updateSet.role = "admin";
-    }
-    if (user.companyId !== undefined) {
-      values.companyId = user.companyId;
-      updateSet.companyId = user.companyId;
-    }
-    if (user.password !== undefined) {
-      values.password = user.password;
-      updateSet.password = user.password;
+      values.role = 'admin';
+      updateSet.role = 'admin';
     }
 
     if (!values.lastSignedIn) {
@@ -139,515 +90,86 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function getUserByEmail(email: string) {
+// ========== SELLER QUERIES ==========
+
+export async function getSellerByUserId(userId: number): Promise<Seller | undefined> {
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
+    console.warn("[Database] Cannot get seller: database not available");
     return undefined;
   }
 
-  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-
+  const result = await db.select().from(sellers).where(eq(sellers.userId, userId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function updateUserCompany(userId: number, companyId: number) {
+export async function createSeller(data: InsertSeller): Promise<Seller> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(users).set({ companyId }).where(eq(users.id, userId));
+  // Only insert fields that are provided, let database handle defaults
+  const insertData: Record<string, any> = {
+    userId: data.userId,
+    storeName: data.storeName,
+    businessType: data.businessType || 'commerce',
+  };
+
+  // Add optional fields if provided
+  if (data.storeDescription) insertData.storeDescription = data.storeDescription;
+  if (data.cnpj) insertData.cnpj = data.cnpj;
+  if (data.phone) insertData.phone = data.phone;
+  if (data.address) insertData.address = data.address;
+  if (data.city) insertData.city = data.city;
+  if (data.state) insertData.state = data.state;
+  if (data.zipCode) insertData.zipCode = data.zipCode;
+  if (data.buscazapCompanyId != null) insertData.buscazapCompanyId = data.buscazapCompanyId;
+
+  const result = await db.insert(sellers).values(insertData as InsertSeller);
+  const sellerId = result[0].insertId;
+  
+  const seller = await db.select().from(sellers).where(eq(sellers.id, sellerId as number)).limit(1);
+  if (!seller.length) throw new Error("Failed to create seller");
+  
+  return seller[0];
 }
 
-/** Criar garçom (login/senha) vinculado à empresa. Usado pelo PDV web. */
-export async function createWaiter(companyId: number, email: string, password: string, name: string): Promise<number> {
+export async function updateSellerBusinessType(sellerId: number, businessType: BusinessType): Promise<void> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const existing = await getUserByEmail(email);
-  if (existing) {
-    throw new Error("Já existe um usuário com este email");
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const openId = `local_${nanoid(32)}`;
-
-  await db.insert(users).values({
-    openId,
-    email: email.toLowerCase().trim(),
-    password: hashedPassword,
-    name: name || null,
-    loginMethod: "email",
-    role: "waiter",
-    companyId,
-    lastSignedIn: new Date(),
-  });
-
-  const created = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-  return created[0]?.id ?? 0;
+  await db.update(sellers).set({ businessType }).where(eq(sellers.id, sellerId));
 }
 
-/** Listar garçons da empresa */
-export async function getWaitersByCompany(companyId: number) {
+export async function updateSeller(sellerId: number, data: Partial<InsertSeller>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(sellers).set(data).where(eq(sellers.id, sellerId));
+}
+
+// ========== PRODUCT QUERIES ==========
+
+export async function getProductsBySellerIdWithStock(sellerId: number) {
   const db = await getDb();
   if (!db) return [];
 
-  return await db
-    .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-      companyId: users.companyId,
-      lastSignedIn: users.lastSignedIn,
-    })
-    .from(users)
-    .where(and(eq(users.companyId, companyId), eq(users.role, "waiter")));
-}
-
-/** Criar usuário admin da empresa (painel BuscaZap IA - login por empresa). */
-export async function createCompanyAdminUser(
-  companyId: number,
-  email: string,
-  passwordHash: string,
-  name: string
-): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const openId = `company_${nanoid(24)}`;
-  await db.insert(users).values({
-    openId,
-    email: email.toLowerCase().trim(),
-    password: passwordHash,
-    name: name || null,
-    loginMethod: "email",
-    role: "admin",
-    companyId,
-    lastSignedIn: new Date(),
-  });
-  const created = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-  return created[0]?.id ?? 0;
-}
-
-/** Remover garçom (apenas desvincula da empresa; usuário continua no sistema) */
-export async function removeWaiter(waiterId: number, companyId: number): Promise<void> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db
-    .update(users)
-    .set({ companyId: null })
-    .where(and(eq(users.id, waiterId), eq(users.companyId, companyId), eq(users.role, "waiter")));
-}
-
-// ==================== COMPANIES ====================
-
-/** Busca empresas por nome (para admin global). Não carrega todas de uma vez. */
-export async function searchCompaniesByName(query: string, limit = 50) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const term = `%${query.trim()}%`;
-  return await db
-    .select()
-    .from(companies)
-    .where(and(eq(companies.isActive, true), like(companies.name, term)))
-    .limit(limit);
-}
-
-export async function getCompanyById(id: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.select().from(companies).where(eq(companies.id, id)).limit(1);
-  return result[0];
-}
-
-export async function createCompany(data: Omit<Company, "id" | "createdAt" | "updatedAt">) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(companies).values(data);
-  return result[0].insertId;
-}
-
-// ==================== TABLES ====================
-
-export async function getTablesByCompany(companyId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  return await db.select().from(tables).where(eq(tables.companyId, companyId));
-}
-
-export async function updateTableStatus(
-  tableId: number,
-  status: "available" | "occupied" | "reserved",
-  orderId?: number
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db
-    .update(tables)
-    .set({ status, currentOrderId: orderId })
-    .where(eq(tables.id, tableId));
-}
-
-export async function createTable(data: Omit<Table, "id" | "createdAt" | "updatedAt">) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(tables).values(data);
-  return result[0].insertId;
-}
-
-// ==================== CATEGORIES ====================
-
-export async function getCategoriesByCompany(companyId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  return await db
-    .select()
-    .from(categories)
-    .where(and(eq(categories.companyId, companyId), eq(categories.isActive, true)))
-    .orderBy(categories.order);
-}
-
-// ==================== PRODUCTS ====================
-
-export async function getProductsByCompany(companyId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  return await db
-    .select()
-    .from(products)
-    .where(and(eq(products.companyId, companyId), eq(products.isActive, true)));
-}
-
-export async function getProductsByCategory(companyId: number, categoryId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  return await db
-    .select()
-    .from(products)
-    .where(
-      and(
-        eq(products.companyId, companyId),
-        eq(products.categoryId, categoryId),
-        eq(products.isActive, true)
-      )
-    );
-}
-
-// ==================== ORDERS ====================
-
-export async function createOrder(data: Omit<Order, "id" | "createdAt" | "updatedAt">) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(orders).values(data);
-  return result[0].insertId;
-}
-
-export async function getOrderById(orderId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
-  return result[0];
-}
-
-export async function getOrdersByCompany(companyId: number, status?: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  if (status) {
-    return await db
-      .select()
-      .from(orders)
-      .where(and(eq(orders.companyId, companyId), eq(orders.status, status as any)))
-      .orderBy(desc(orders.createdAt));
-  }
-
-  return await db
-    .select()
-    .from(orders)
-    .where(eq(orders.companyId, companyId))
-    .orderBy(desc(orders.createdAt));
-}
-
-export async function updateOrderStatus(orderId: number, status: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db.update(orders).set({ status: status as any }).where(eq(orders.id, orderId));
-}
-
-export async function updateOrderTotal(orderId: number, subtotal: string, total: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db.update(orders).set({ subtotal, total }).where(eq(orders.id, orderId));
-}
-
-export async function closeOrder(orderId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db
-    .update(orders)
-    .set({ status: "closed", closedAt: new Date() })
-    .where(eq(orders.id, orderId));
-}
-
-// ==================== ORDER ITEMS ====================
-
-export async function addOrderItem(data: Omit<OrderItem, "id" | "createdAt" | "updatedAt">) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(orderItems).values(data);
-  return result[0].insertId;
-}
-
-export async function getOrderItems(orderId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  return await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-}
-
-export async function updateOrderItemStatus(itemId: number, status: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db.update(orderItems).set({ status: status as any }).where(eq(orderItems.id, itemId));
-}
-
-// ==================== PAYMENT METHODS ====================
-
-export async function getPaymentMethodsByCompany(companyId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  return await db
-    .select()
-    .from(paymentMethods)
-    .where(and(eq(paymentMethods.companyId, companyId), eq(paymentMethods.isActive, true)));
-}
-
-// ==================== PAYMENTS ====================
-
-export async function addPayment(data: Omit<typeof payments.$inferInsert, "id" | "createdAt">) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(payments).values(data);
-  return result[0].insertId;
-}
-
-export async function getPaymentsByOrder(orderId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  return await db.select().from(payments).where(eq(payments.orderId, orderId));
-}
-
-
-export async function createBillSplit(
-  orderId: number,
-  numberOfPeople: number,
-  amountPerPerson: string
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(billSplits).values({
-    orderId,
-    numberOfPeople,
-    amountPerPerson,
-  });
-  return result[0].insertId;
-}
-
-export async function getBillSplit(orderId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.select().from(billSplits).where(eq(billSplits.orderId, orderId)).limit(1);
-  return result[0];
-}
-
-// ==================== PRINTERS ====================
-
-export async function getPrintersByCompany(companyId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  return await db
-    .select()
-    .from(printers)
-    .where(and(eq(printers.companyId, companyId), eq(printers.isActive, true)));
-}
-
-export async function getPrinterBySector(companyId: number, sector: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
   const result = await db
     .select()
-    .from(printers)
-    .where(
-      and(
-        eq(printers.companyId, companyId),
-        eq(printers.productionSector, sector),
-        eq(printers.isActive, true)
-      )
-    )
-    .limit(1);
+    .from(products)
+    .where(eq(products.sellerId, sellerId));
 
-  return result[0];
+  return result;
 }
 
-
-// ==================== DELIVERY REQUESTS ====================
-
-export async function createDeliveryRequest(
-  data: Omit<typeof deliveryRequests.$inferInsert, "id" | "requestedAt" | "acceptedAt" | "deliveredAt">
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(deliveryRequests).values(data);
-  return result[0].insertId;
-}
-
-export async function getDeliveryRequestsByCompany(companyId: number, status?: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  if (status) {
-    return await db
-      .select()
-      .from(deliveryRequests)
-      .where(
-        and(
-          eq(deliveryRequests.companyId, companyId),
-          eq(deliveryRequests.status, status as any)
-        )
-      )
-      .orderBy(desc(deliveryRequests.requestedAt));
-  }
-
-  return await db
-    .select()
-    .from(deliveryRequests)
-    .where(eq(deliveryRequests.companyId, companyId))
-    .orderBy(desc(deliveryRequests.requestedAt));
-}
-
-export async function updateDeliveryRequestStatus(
-  requestId: number,
-  status: string,
-  deliveryPersonId?: number,
-  deliveryPersonName?: string
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const updateData: any = { status };
-
-  if (status === "accepted" && deliveryPersonId) {
-    updateData.deliveryPersonId = deliveryPersonId;
-    updateData.deliveryPersonName = deliveryPersonName;
-    updateData.acceptedAt = new Date();
-  }
-
-  if (status === "delivered") {
-    updateData.deliveredAt = new Date();
-  }
-
-  await db.update(deliveryRequests).set(updateData).where(eq(deliveryRequests.id, requestId));
-}
-
-export async function getDeliveryRequestById(requestId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db
-    .select()
-    .from(deliveryRequests)
-    .where(eq(deliveryRequests.id, requestId))
-    .limit(1);
-
-  return result[0];
-}
-
-/**
- * Pool global (cidade): pedidos pendentes priorizados.
- * Importante: NÃO mistura solicitações marcadas para entregadores próprios.
- *
- * Nota: `cityId` ainda não é aplicado porque `companies` não tem `cityId` no schema atual.
- */
-export async function getPendingOrdersPrioritized(cityId?: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // cityId reservado para quando `companies.cityId` existir
-  void cityId;
-
-  const rows = await db
-    .select({
-      id: deliveryRequests.id,
-      companyId: deliveryRequests.companyId,
-      orderId: deliveryRequests.orderId,
-      customerName: deliveryRequests.customerName,
-      customerPhone: deliveryRequests.customerPhone,
-      deliveryAddress: deliveryRequests.deliveryAddress,
-      deliveryFee: deliveryRequests.deliveryFee,
-      requestedAt: deliveryRequests.requestedAt,
-      companyName: companies.name,
-      pickupAddress: companies.address,
-    })
-    .from(deliveryRequests)
-    .innerJoin(companies, eq(deliveryRequests.companyId, companies.id))
-    .where(
-      and(
-        eq(deliveryRequests.status, "pending"),
-        isNull(deliveryRequests.deliveryPersonId),
-        // Não misturar com entregadores próprios
-        eq(deliveryRequests.deliveryType, "city")
-      )
-    )
-    .orderBy(asc(deliveryRequests.requestedAt));
-
-  const now = Date.now();
-  return rows.map((r) => {
-    const requestedAtMs = new Date(r.requestedAt as any).getTime();
-    const waitingTimeMinutes = Math.max(0, Math.floor((now - requestedAtMs) / 60000));
-
-    return {
-      ...r,
-      waitingTimeMinutes,
-    };
-  });
-}
-
-
-// ==================== PRODUCTS CRUD ====================
-
-export async function createProduct(data: Omit<Product, "id" | "createdAt" | "updatedAt">) {
+export async function createProduct(data: InsertProduct) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   const result = await db.insert(products).values(data);
-  return result[0].insertId;
+  return result;
 }
 
-export async function updateProduct(productId: number, data: Partial<Product>) {
+export async function updateProduct(productId: number, data: Partial<InsertProduct>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -658,2204 +180,218 @@ export async function deleteProduct(productId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Soft delete
-  await db.update(products).set({ isActive: false }).where(eq(products.id, productId));
+  await db.delete(products).where(eq(products.id, productId));
 }
 
 export async function getProductById(productId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
+  if (!db) return null;
   const result = await db.select().from(products).where(eq(products.id, productId)).limit(1);
-  return result[0];
+  return result.length > 0 ? result[0] : null;
 }
 
-export async function getAllProductsByCompany(companyId: number, includeInactive = false) {
+export async function updateProductBuscazapMenuItemId(productId: number, buscazapMenuItemId: number | null) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-
-  if (includeInactive) {
-    return await db.select().from(products).where(eq(products.companyId, companyId));
-  }
-
-  return await db
-    .select()
-    .from(products)
-    .where(and(eq(products.companyId, companyId), eq(products.isActive, true)));
+  await db.update(products).set({ buscazapMenuItemId } as any).where(eq(products.id, productId));
 }
 
+// ========== PEDIJA ORDERS QUERIES ==========
 
-// ==================== CASH REGISTER ====================
-
-export async function openCashRegister(data: {
-  companyId: number;
-  userId: number;
-  openingAmount: number;
-}) {
+export async function createPedijaOrder(data: InsertPedijaOrder): Promise<PedijaOrder> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const result = await db.insert(pedijaOrders).values(data);
+  const insertId = (result[0] as any)?.insertId;
+  const row = await db.select().from(pedijaOrders).where(eq(pedijaOrders.id, insertId)).limit(1);
+  if (!row.length) throw new Error("Failed to create pedijaOrder");
+  return row[0];
+}
 
-  // Verificar se já existe caixa aberto para este usuário
-  const openRegister = await db
-    .select()
-    .from(cashRegisters)
-    .where(and(eq(cashRegisters.userId, data.userId), eq(cashRegisters.status, "open")))
-    .limit(1);
-
-  if (openRegister.length > 0) {
-    throw new Error("Já existe um caixa aberto para este usuário");
-  }
-
-  const result = await db.insert(cashRegisters).values({
-    companyId: data.companyId,
-    userId: data.userId,
-    openingAmount: data.openingAmount.toString(),
-    status: "open",
+export async function upsertPedijaOrder(data: InsertPedijaOrder): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(pedijaOrders).values(data).onDuplicateKeyUpdate({
+    set: {
+      customerName: data.customerName,
+      total: data.total,
+      status: data.status ?? "pending",
+      items: data.items,
+      updatedAt: new Date(),
+    },
   });
-
-  return result[0].insertId;
 }
 
-export async function getOpenCashRegister(userId: number) {
+export async function getPedijaOrdersBySellerIdWithStatus(sellerId: number, status?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const results = await db.select().from(pedijaOrders).where(eq(pedijaOrders.sellerId, sellerId)).orderBy(desc(pedijaOrders.createdAt));
+  if (status) return results.filter((r) => r.status === status);
+  return results;
+}
+
+export async function updatePedijaOrderStatus(pedijaOrderId: number, status: string): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(pedijaOrders).set({ status, updatedAt: new Date() }).where(eq(pedijaOrders.id, pedijaOrderId));
+}
+
+export async function getSellerIdByBuscazapCompanyId(buscazapCompanyId: number): Promise<number | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select({ id: sellers.id }).from(sellers).where(eq(sellers.buscazapCompanyId as any, buscazapCompanyId)).limit(1);
+  return result.length > 0 ? result[0].id : null;
+}
+
+// ========== CUSTOMER QUERIES ==========
+
+export async function getCustomersBySellerIdWithStats(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db
+    .select()
+    .from(customers)
+    .where(eq(customers.sellerId, sellerId))
+    .orderBy(desc(customers.createdAt));
+
+  return result;
+}
+
+export async function getCustomerById(customerId: number) {
   const db = await getDb();
   if (!db) return null;
 
   const result = await db
     .select()
-    .from(cashRegisters)
-    .where(and(eq(cashRegisters.userId, userId), eq(cashRegisters.status, "open")))
+    .from(customers)
+    .where(eq(customers.id, customerId))
     .limit(1);
 
-  return result[0] || null;
+  return result.length > 0 ? result[0] : null;
 }
 
-export async function addCashMovement(data: {
-  cashRegisterId: number;
-  type: "withdrawal" | "deposit";
-  amount: number;
-  reason: string;
-  userId: number;
-}) {
+export async function createOrUpdateCustomer(data: InsertCustomer) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const result = await db.insert(cashMovements).values({
-    cashRegisterId: data.cashRegisterId,
-    type: data.type,
-    amount: data.amount.toString(),
-    reason: data.reason,
-    userId: data.userId,
+  const result = await db.insert(customers).values(data).onDuplicateKeyUpdate({
+    set: {
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      city: data.city,
+      state: data.state,
+      address: data.address,
+      updatedAt: new Date(),
+    },
   });
 
-  return result[0].insertId;
+  return result;
 }
 
-export async function getCashMovements(cashRegisterId: number) {
+// ========== ORDER QUERIES ==========
+
+export async function getOrdersBySellerIdWithItems(sellerId: number) {
   const db = await getDb();
   if (!db) return [];
 
-  return await db
-    .select()
-    .from(cashMovements)
-    .where(eq(cashMovements.cashRegisterId, cashRegisterId));
-}
-
-export async function closeCashRegister(data: {
-  cashRegisterId: number;
-  closingAmount: number;
-  expectedAmount: number;
-  notes?: string;
-  closureDetails: Array<{
-    paymentMethodId: number;
-    expectedAmount: number;
-    countedAmount: number;
-  }>;
-}) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const difference = data.closingAmount - data.expectedAmount;
-
-  // Atualizar o registro de caixa
-  await db
-    .update(cashRegisters)
-    .set({
-      closingAmount: data.closingAmount.toString(),
-      expectedAmount: data.expectedAmount.toString(),
-      difference: difference.toString(),
-      status: "closed",
-      notes: data.notes,
-      closedAt: new Date(),
-    })
-    .where(eq(cashRegisters.id, data.cashRegisterId));
-
-  // Inserir detalhes de fechamento por meio de pagamento
-  for (const detail of data.closureDetails) {
-    await db.insert(cashClosures).values({
-      cashRegisterId: data.cashRegisterId,
-      paymentMethodId: detail.paymentMethodId,
-      expectedAmount: detail.expectedAmount.toString(),
-      countedAmount: detail.countedAmount.toString(),
-      difference: (detail.countedAmount - detail.expectedAmount).toString(),
-    });
-  }
-
-  return { success: true, difference };
-}
-
-export async function getCashRegisterSummary(cashRegisterId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Buscar registro de caixa
-  const register = await db
-    .select()
-    .from(cashRegisters)
-    .where(eq(cashRegisters.id, cashRegisterId))
-    .limit(1);
-
-  if (!register[0]) {
-    throw new Error("Caixa não encontrado");
-  }
-
-  // Buscar todos os pagamentos do caixa (pedidos fechados durante o período)
-  const paymentsData = await db
-    .select({
-      paymentMethodId: payments.paymentMethodId,
-      amount: payments.amount,
-      paymentMethodName: paymentMethods.name,
-      paymentMethodType: paymentMethods.type,
-    })
-    .from(payments)
-    .innerJoin(orders, eq(payments.orderId, orders.id))
-    .innerJoin(paymentMethods, eq(payments.paymentMethodId, paymentMethods.id))
-    .where(
-      and(
-        eq(orders.companyId, register[0].companyId),
-        gte(orders.closedAt, register[0].openedAt),
-        register[0].closedAt ? lte(orders.closedAt, register[0].closedAt) : undefined
-      )
-    );
-
-  // Agrupar por método de pagamento
-  const paymentsByMethod = paymentsData.reduce((acc, payment) => {
-    const key = payment.paymentMethodId;
-    if (!acc[key]) {
-      acc[key] = {
-        paymentMethodId: payment.paymentMethodId,
-        paymentMethodName: payment.paymentMethodName,
-        paymentMethodType: payment.paymentMethodType,
-        total: 0,
-      };
-    }
-    acc[key].total += parseFloat(payment.amount);
-    return acc;
-  }, {} as Record<number, any>);
-
-  // Buscar movimentações de caixa
-  const movements = await getCashMovements(cashRegisterId);
-
-  // Calcular totais
-  const totalWithdrawals = movements
-    .filter((m) => m.type === "withdrawal")
-    .reduce((sum, m) => sum + parseFloat(m.amount), 0);
-
-  const totalDeposits = movements
-    .filter((m) => m.type === "deposit")
-    .reduce((sum, m) => sum + parseFloat(m.amount), 0);
-
-  const totalSales = Object.values(paymentsByMethod).reduce(
-    (sum: number, method: any) => sum + method.total,
-    0
-  );
-
-  const expectedAmount =
-    parseFloat(register[0].openingAmount) + totalSales + totalDeposits - totalWithdrawals;
-
-  return {
-    register: register[0],
-    paymentsByMethod: Object.values(paymentsByMethod),
-    movements,
-    totalSales,
-    totalWithdrawals,
-    totalDeposits,
-    expectedAmount,
-  };
-}
-
-export async function getCashRegisterHistory(companyId: number, limit = 10) {
-  const db = await getDb();
-  if (!db) return [];
-
-  return await db
-    .select()
-    .from(cashRegisters)
-    .where(eq(cashRegisters.companyId, companyId))
-    .orderBy(desc(cashRegisters.openedAt))
-    .limit(limit);
-}
-
-
-// ==================== INTEGRAÇÃO BUSCAZAP ====================
-
-/**
- * Criar pedido vindo do BuscaZap
- */
-export async function createOrderFromBuscaZap(data: {
-  companyId: number;
-  deliveryOrderId: string;
-  customerName: string;
-  customerPhone: string;
-  items: Array<{
-    productId: number;
-    quantity: number;
-    unitPrice: string;
-    notes?: string;
-  }>;
-  deliveryAddress?: string;
-  notes?: string;
-}) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const orderNumber = `BZ-${Date.now().toString().slice(-6)}`;
-
-  // Calcular subtotal
-  const subtotal = data.items.reduce((sum, item) => {
-    return sum + parseFloat(item.unitPrice) * item.quantity;
-  }, 0);
-
-  // Criar pedido
-  const [order] = await db.insert(orders).values({
-    companyId: data.companyId,
-    orderNumber,
-    type: "delivery",
-    tableId: null,
-    waiterId: null,
-    customerName: data.customerName,
-    customerPhone: data.customerPhone,
-    status: "open",
-    subtotal: subtotal.toFixed(2),
-    serviceCharge: "0.00",
-    discount: "0.00",
-    total: subtotal.toFixed(2),
-    notes: data.notes || null,
-    deliveryOrderId: data.deliveryOrderId,
-    source: "buscazap",
-    closedAt: null,
-  });
-
-  const orderId = order.insertId;
-
-  // Adicionar itens
-  for (const item of data.items) {
-    const itemSubtotal = parseFloat(item.unitPrice) * item.quantity;
-    
-    await db.insert(orderItems).values({
-      orderId,
-      productId: item.productId,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      subtotal: itemSubtotal.toFixed(2),
-      notes: item.notes || null,
-      status: "pending",
-      productionSector: null,
-    });
-  }
-
-  // Emitir evento WebSocket de novo pedido
-  try {
-    const { emitNewOrder } = await import("./_core/websocket");
-    const fullOrder = await getOrderById(orderId);
-    if (fullOrder) {
-      emitNewOrder(data.companyId, fullOrder);
-    }
-  } catch (error) {
-    console.log('[WebSocket] Failed to emit new order event:', error);
-  }
-
-  return { orderId, orderNumber };
-}
-
-// ==================== INTEGRAÇÃO PLATAFORMAS EXTERNAS (UNIFICADO) ====================
-
-/**
- * Criar pedido vindo de qualquer plataforma externa (Pedijá, Iffod, 99Food, etc.)
- * Função genérica que normaliza pedidos de diferentes plataformas
- */
-export async function createOrderFromExternalPlatform(data: {
-  companyId: number;
-  platform: "pedija" | "iffod" | "99food" | "rappi" | "uber_eats" | "ifood" | "other";
-  externalOrderId: string; // ID do pedido na plataforma externa
-  customerName: string;
-  customerPhone: string;
-  items: Array<{
-    productId?: number; // Se não tiver, tentar buscar por nome
-    productName: string; // Nome do produto na plataforma externa
-    quantity: number;
-    unitPrice: string;
-    notes?: string;
-  }>;
-  deliveryAddress?: string;
-  deliveryFee?: string;
-  subtotal?: string;
-  total?: string;
-  notes?: string;
-  paymentMethod?: string;
-}) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Verificar se a integração está ativa
-  const integration = await db
-    .select()
-    .from(externalPlatformIntegrations)
-    .where(
-      and(
-        eq(externalPlatformIntegrations.companyId, data.companyId),
-        eq(externalPlatformIntegrations.platform, data.platform),
-        eq(externalPlatformIntegrations.isActive, true)
-      )
-    )
-    .limit(1);
-
-  if (integration.length === 0) {
-    throw new Error(`Integração com ${data.platform} não está ativa para esta empresa`);
-  }
-
-  // Gerar número do pedido com prefixo da plataforma
-  const platformPrefix: Record<string, string> = {
-    pedija: "PJ",
-    iffod: "IF",
-    "99food": "99",
-    rappi: "RP",
-    uber_eats: "UE",
-    ifood: "IFD",
-    other: "EXT",
-  };
-  const prefix = platformPrefix[data.platform] || "EXT";
-  const orderNumber = `${prefix}-${Date.now().toString().slice(-6)}`;
-
-  // Calcular valores se não fornecidos
-  const subtotal = data.subtotal
-    ? parseFloat(data.subtotal)
-    : data.items.reduce((sum, item) => sum + parseFloat(item.unitPrice) * item.quantity, 0);
-  
-  const deliveryFee = data.deliveryFee ? parseFloat(data.deliveryFee) : 0;
-  const total = data.total ? parseFloat(data.total) : subtotal + deliveryFee;
-
-  // Criar pedido
-  const [order] = await db.insert(orders).values({
-    companyId: data.companyId,
-    orderNumber,
-    type: "delivery",
-    tableId: null,
-    waiterId: null,
-    customerName: data.customerName,
-    customerPhone: data.customerPhone,
-    status: "open",
-    subtotal: subtotal.toFixed(2),
-    serviceCharge: deliveryFee.toFixed(2),
-    discount: "0.00",
-    total: total.toFixed(2),
-    notes: data.notes || null,
-    deliveryOrderId: data.externalOrderId,
-    externalPlatform: data.platform,
-    source: data.platform === "pedija" ? "pedija" : 
-            data.platform === "iffod" ? "iffod" :
-            data.platform === "99food" ? "99food" :
-            data.platform === "rappi" ? "rappi" :
-            data.platform === "uber_eats" ? "uber_eats" :
-            data.platform === "ifood" ? "ifood" : "other",
-    closedAt: null,
-  });
-
-  const orderId = order.insertId;
-
-  // Adicionar itens (tentar mapear produtos por nome se productId não fornecido)
-  for (const item of data.items) {
-    let productId = item.productId;
-
-    // Se não tiver productId, tentar buscar por nome
-    if (!productId) {
-      const product = await db
-        .select()
-        .from(products)
-        .where(
-          and(
-            eq(products.companyId, data.companyId),
-            eq(products.name, item.productName),
-            eq(products.isActive, true)
-          )
-        )
-        .limit(1);
-      
-      if (product.length > 0) {
-        productId = product[0].id;
-      } else {
-        // Se não encontrar, criar produto temporário ou pular (depende da estratégia)
-        console.warn(`[External Platform] Produto não encontrado: ${item.productName} para empresa ${data.companyId}`);
-        // Por enquanto, vamos pular itens sem produto correspondente
-        continue;
-      }
-    }
-
-    const itemSubtotal = parseFloat(item.unitPrice) * item.quantity;
-    
-    await db.insert(orderItems).values({
-      orderId,
-      productId,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      subtotal: itemSubtotal.toFixed(2),
-      notes: item.notes || null,
-      status: "pending",
-      productionSector: null,
-    });
-  }
-
-  // Auto-aceitar se configurado
-  if (integration[0].settings?.autoAccept) {
-    await db
-      .update(orders)
-      .set({ status: "sent_to_kitchen" })
-      .where(eq(orders.id, orderId));
-  }
-
-  // Auto-imprimir se configurado
-  if (integration[0].settings?.autoPrint) {
-    try {
-      await db.printOrder(orderId);
-    } catch (error) {
-      console.log(`[External Platform] Falha ao imprimir pedido ${orderId}:`, error);
-    }
-  }
-
-  // Emitir evento WebSocket de novo pedido
-  try {
-    const { emitNewOrder } = await import("./_core/websocket");
-    const fullOrder = await getOrderById(orderId);
-    if (fullOrder) {
-      emitNewOrder(data.companyId, fullOrder);
-    }
-  } catch (error) {
-    console.log('[WebSocket] Failed to emit new order event:', error);
-  }
-
-  return { orderId, orderNumber };
-}
-
-/**
- * Listar todos os pedidos externos (de todas as plataformas) pendentes
- */
-export async function getAllExternalOrders(companyId: number) {
-  const db = await getDb();
-  if (!db) return [];
-
-  return await db
+  const result = await db
     .select()
     .from(orders)
-    .where(
-      and(
-        eq(orders.companyId, companyId),
-        sql`${orders.source} IN ('pedija', 'iffod', '99food', 'rappi', 'uber_eats', 'ifood', 'other', 'buscazap')`,
-        ne(orders.status, "closed"),
-        ne(orders.status, "cancelled")
-      )
-    )
+    .where(eq(orders.sellerId, sellerId))
     .orderBy(desc(orders.createdAt));
+
+  return result;
 }
 
-/**
- * Listar pedidos do BuscaZap pendentes
- */
-export async function getBuscaZapOrders(companyId: number) {
-  const db = await getDb();
-  if (!db) return [];
-
-  return await db
-    .select()
-    .from(orders)
-    .where(
-      and(
-        eq(orders.companyId, companyId),
-        eq(orders.source, "buscazap"),
-        ne(orders.status, "closed"),
-        ne(orders.status, "cancelled")
-      )
-    )
-    .orderBy(desc(orders.createdAt));
-}
-
-/**
- * Aceitar pedido do BuscaZap
- */
-export async function acceptBuscaZapOrder(orderId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const order = await getOrderById(orderId);
-  if (!order) throw new Error("Pedido não encontrado");
-
-  await db
-    .update(orders)
-    .set({ status: "sent_to_kitchen" })
-    .where(eq(orders.id, orderId));
-
-  try {
-    const { emitOrderStatusUpdate } = await import("./_core/websocket");
-    emitOrderStatusUpdate(order.companyId, orderId, "sent_to_kitchen");
-  } catch (error) {
-    console.log("[WebSocket] Failed to emit order-status-update:", error);
-  }
-
-  return { success: true };
-}
-
-/**
- * Rejeitar pedido do BuscaZap
- */
-export async function rejectBuscaZapOrder(orderId: number, reason?: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const order = await getOrderById(orderId);
-  if (!order) throw new Error("Pedido não encontrado");
-
-  await db
-    .update(orders)
-    .set({ 
-      status: "cancelled",
-      notes: reason || "Pedido rejeitado pela empresa",
-    })
-    .where(eq(orders.id, orderId));
-
-  try {
-    const { emitOrderStatusUpdate } = await import("./_core/websocket");
-    emitOrderStatusUpdate(order.companyId, orderId, "cancelled");
-  } catch (error) {
-    console.log("[WebSocket] Failed to emit order-status-update:", error);
-  }
-
-  return { success: true };
-}
-
-/**
- * Atualizar status do pedido do BuscaZap
- */
-export async function updateBuscaZapOrderStatus(
-  orderId: number,
-  status: "preparing" | "ready" | "closed"
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const order = await getOrderById(orderId);
-  if (!order) throw new Error("Pedido não encontrado");
-
-  const updateData: any = { status };
-  
-  if (status === "closed") {
-    updateData.closedAt = new Date();
-  }
-
-  await db
-    .update(orders)
-    .set(updateData)
-    .where(eq(orders.id, orderId));
-
-  try {
-    const { emitOrderStatusUpdate } = await import("./_core/websocket");
-    emitOrderStatusUpdate(order.companyId, orderId, status);
-  } catch (error) {
-    console.log("[WebSocket] Failed to emit order-status-update:", error);
-  }
-
-  return { success: true };
-}
-
-
-// ==================== SINCRONIZAÇÃO DE CARDÁPIO ====================
-
-/**
- * Sincronizar produtos do BuscaZap para o PDV
- * Importa produtos que ainda não existem no PDV
- */
-export async function syncProductsFromBuscaZap(companyId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Buscar todos os produtos da empresa no BuscaZap
-  const buscazapProducts = await db
-    .select()
-    .from(products)
-    .where(eq(products.companyId, companyId));
-
-  // Buscar produtos que já existem no PDV
-  const pdvProducts = await db
-    .select()
-    .from(products)
-    .where(eq(products.companyId, companyId));
-
-  const syncedCount = buscazapProducts.length;
-  const newCount = 0;
-
-  return {
-    success: true,
-    syncedCount,
-    newCount,
-    message: `${syncedCount} produtos sincronizados`,
-  };
-}
-
-/**
- * Verificar se produtos estão sincronizados
- */
-export async function checkProductSync(companyId: number) {
-  const db = await getDb();
-  if (!db) return { synced: false, count: 0 };
-
-  const productCount = await db
-    .select()
-    .from(products)
-    .where(eq(products.companyId, companyId));
-
-  return {
-    synced: productCount.length > 0,
-    count: productCount.length,
-  };
-}
-
-
-// ==================== IMPRESSÃO DE PEDIDOS ====================
-
-/**
- * Formatar pedido para impressão térmica
- */
-export function formatOrderForPrint(order: any, items: any[]): string {
-  const width = 32; // Largura padrão para impressora 58mm
-  const line = "=".repeat(width);
-  const divider = "-".repeat(width);
-
-  let receipt = "";
-  
-  // Cabeçalho
-  receipt += `${line}\n`;
-  receipt += centerText("NOVO PEDIDO BUSCAZAP", width) + "\n";
-  receipt += `${line}\n\n`;
-  
-  // Número do pedido
-  receipt += `Pedido: ${order.orderNumber}\n`;
-  receipt += `Data: ${new Date(order.createdAt).toLocaleString("pt-BR")}\n`;
-  receipt += `${divider}\n\n`;
-  
-  // Cliente
-  receipt += "CLIENTE:\n";
-  receipt += `${order.customerName}\n`;
-  receipt += `${order.customerPhone}\n`;
-  receipt += `${divider}\n\n`;
-  
-  // Itens
-  receipt += "ITENS:\n";
-  items.forEach((item) => {
-    receipt += `${item.quantity}x ${item.productName}\n`;
-    if (item.notes) {
-      receipt += `   OBS: ${item.notes}\n`;
-    }
-    receipt += `   R$ ${parseFloat(item.subtotal).toFixed(2)}\n`;
-  });
-  receipt += `${divider}\n\n`;
-  
-  // Total
-  receipt += `TOTAL: R$ ${parseFloat(order.total).toFixed(2)}\n`;
-  
-  // Observações gerais
-  if (order.notes) {
-    receipt += `${divider}\n`;
-    receipt += "OBSERVAÇÕES:\n";
-    receipt += `${order.notes}\n`;
-  }
-  
-  receipt += `${line}\n\n\n`;
-  
-  return receipt;
-}
-
-function centerText(text: string, width: number): string {
-  const padding = Math.floor((width - text.length) / 2);
-  return " ".repeat(padding) + text;
-}
-
-/**
- * Buscar impressora da cozinha
- */
-export async function getKitchenPrinter(companyId: number) {
+export async function getOrderById(orderId: number) {
   const db = await getDb();
   if (!db) return null;
 
-  const printer = await db
-    .select()
-    .from(printers)
-    .where(
-      and(
-        eq(printers.companyId, companyId),
-        eq(printers.type, "kitchen"),
-        eq(printers.isActive, true)
-      )
-    )
-    .limit(1);
-
-  return printer[0] || null;
-}
-
-/**
- * Enviar para impressão (simulado - em produção usaria biblioteca de impressão)
- */
-export async function printOrder(orderId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Buscar pedido com itens
-  const order = await db
+  const result = await db
     .select()
     .from(orders)
     .where(eq(orders.id, orderId))
     .limit(1);
 
-  if (!order[0]) {
-    throw new Error("Pedido não encontrado");
-  }
-
-  const items = await db
-    .select({
-      quantity: orderItems.quantity,
-      productName: products.name,
-      subtotal: orderItems.subtotal,
-      notes: orderItems.notes,
-    })
-    .from(orderItems)
-    .leftJoin(products, eq(orderItems.productId, products.id))
-    .where(eq(orderItems.orderId, orderId));
-
-  // Formatar para impressão
-  const printContent = formatOrderForPrint(order[0], items);
-
-  // Buscar impressora
-  const printer = await getKitchenPrinter(order[0].companyId);
-
-  if (!printer) {
-    console.log("[PRINT] Nenhuma impressora configurada");
-    console.log(printContent);
-    return { success: false, message: "Nenhuma impressora configurada" };
-  }
-
-  // Em produção, aqui enviaria para a impressora via rede
-  // Por enquanto, apenas loga o conteúdo
-  console.log(`[PRINT] Enviando para impressora: ${printer.name}`);
-  console.log(printContent);
-
-  return { success: true, message: "Pedido enviado para impressão" };
+  return result.length > 0 ? result[0] : null;
 }
 
-
-// ==================== NOTIFICAÇÕES PUSH ====================
-
-/**
- * Enviar notificação push para o cliente
- */
-export async function notifyCustomer(data: {
-  orderId: number;
-  title: string;
-  message: string;
-}) {
+export async function getOrderItemsByOrderId(orderId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Buscar pedido para pegar informações do cliente
-  const order = await db
-    .select()
-    .from(orders)
-    .where(eq(orders.id, data.orderId))
-    .limit(1);
-
-  if (!order[0]) {
-    throw new Error("Pedido não encontrado");
-  }
-
-  // Em produção, aqui enviaria notificação via Firebase/OneSignal/etc
-  // Por enquanto, apenas loga
-  console.log(`[NOTIFICATION] Enviando para: ${order[0].customerName}`);
-  console.log(`[NOTIFICATION] Título: ${data.title}`);
-  console.log(`[NOTIFICATION] Mensagem: ${data.message}`);
-
-  return {
-    success: true,
-    message: "Notificação enviada com sucesso",
-  };
-}
-
-/**
- * Notificar cliente sobre mudança de status do pedido
- */
-export async function notifyOrderStatus(orderId: number, status: string) {
-  const statusMessages: Record<string, { title: string; message: string }> = {
-    sent_to_kitchen: {
-      title: "Pedido Aceito! 🎉",
-      message: "Seu pedido foi aceito e está sendo preparado.",
-    },
-    preparing: {
-      title: "Preparando seu pedido 👨‍🍳",
-      message: "Estamos preparando seu pedido com carinho!",
-    },
-    ready: {
-      title: "Pedido Pronto! ✅",
-      message: "Seu pedido está pronto e será entregue em breve.",
-    },
-    closed: {
-      title: "Pedido Entregue 🚀",
-      message: "Seu pedido foi entregue. Bom apetite!",
-    },
-  };
-
-  const notification = statusMessages[status];
-  if (!notification) {
-    return { success: false, message: "Status inválido" };
-  }
-
-  return await notifyCustomer({
-    orderId,
-    title: notification.title,
-    message: notification.message,
-  });
-}
-
-
-// ==================== ESTATÍSTICAS BUSCAZAP ====================
-
-/**
- * Buscar estatísticas de pedidos do BuscaZap
- */
-export async function getBuscaZapStats(companyId: number, period: "today" | "week" | "month") {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Calcular data de início baseado no período
-  const now = new Date();
-  let startDate = new Date();
-  
-  if (period === "today") {
-    startDate.setHours(0, 0, 0, 0);
-  } else if (period === "week") {
-    startDate.setDate(now.getDate() - 7);
-  } else if (period === "month") {
-    startDate.setDate(now.getDate() - 30);
-  }
-
-  // Buscar todos os pedidos do BuscaZap no período
-  const allOrders = await db
-    .select()
-    .from(orders)
-    .where(
-      and(
-        eq(orders.companyId, companyId),
-        eq(orders.source, "buscazap"),
-        gte(orders.createdAt, startDate)
-      )
-    );
-
-  const totalOrders = allOrders.length;
-  const acceptedOrders = allOrders.filter(o => o.status !== "cancelled").length;
-  const rejectedOrders = allOrders.filter(o => o.status === "cancelled").length;
-  const acceptanceRate = totalOrders > 0 ? (acceptedOrders / totalOrders) * 100 : 0;
-
-  // Calcular valor total e médio
-  const totalRevenue = allOrders
-    .filter(o => o.status === "closed")
-    .reduce((sum, o) => sum + parseFloat(o.total), 0);
-  
-  const avgOrderValue = acceptedOrders > 0 ? totalRevenue / acceptedOrders : 0;
-
-  // Calcular tempo médio de preparo
-  const completedOrders = allOrders.filter(o => o.status === "closed" && o.closedAt);
-  const avgPrepTime = completedOrders.length > 0
-    ? completedOrders.reduce((sum, o) => {
-        const prepTime = new Date(o.closedAt!).getTime() - new Date(o.createdAt).getTime();
-        return sum + prepTime;
-      }, 0) / completedOrders.length / 1000 / 60 // Converter para minutos
-    : 0;
-
-  return {
-    totalOrders,
-    acceptedOrders,
-    rejectedOrders,
-    acceptanceRate: Math.round(acceptanceRate * 10) / 10,
-    totalRevenue,
-    avgOrderValue: Math.round(avgOrderValue * 100) / 100,
-    avgPrepTime: Math.round(avgPrepTime),
-  };
-}
-
-/**
- * Buscar pedidos por horário (para gráfico de horários de pico)
- */
-export async function getOrdersByHour(companyId: number, period: "today" | "week" | "month") {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const now = new Date();
-  let startDate = new Date();
-  
-  if (period === "today") {
-    startDate.setHours(0, 0, 0, 0);
-  } else if (period === "week") {
-    startDate.setDate(now.getDate() - 7);
-  } else if (period === "month") {
-    startDate.setDate(now.getDate() - 30);
-  }
-
-  const allOrders = await db
-    .select()
-    .from(orders)
-    .where(
-      and(
-        eq(orders.companyId, companyId),
-        eq(orders.source, "buscazap"),
-        gte(orders.createdAt, startDate)
-      )
-    );
-
-  // Agrupar por hora
-  const ordersByHour: Record<number, number> = {};
-  for (let i = 0; i < 24; i++) {
-    ordersByHour[i] = 0;
-  }
-
-  allOrders.forEach(order => {
-    const hour = new Date(order.createdAt).getHours();
-    ordersByHour[hour]++;
-  });
-
-  return Object.entries(ordersByHour).map(([hour, count]) => ({
-    hour: parseInt(hour),
-    count,
-  }));
-}
-
-/**
- * Buscar pedidos por dia da semana
- */
-export async function getOrdersByWeekday(companyId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Últimos 30 dias
-  const startDate = new Date();
-  startDate.setDate(startDate.getDate() - 30);
-
-  const allOrders = await db
-    .select()
-    .from(orders)
-    .where(
-      and(
-        eq(orders.companyId, companyId),
-        eq(orders.source, "buscazap"),
-        gte(orders.createdAt, startDate)
-      )
-    );
-
-  // Agrupar por dia da semana
-  const ordersByWeekday: Record<number, number> = {};
-  for (let i = 0; i < 7; i++) {
-    ordersByWeekday[i] = 0;
-  }
-
-  allOrders.forEach(order => {
-    const weekday = new Date(order.createdAt).getDay();
-    ordersByWeekday[weekday]++;
-  });
-
-  const weekdayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-
-  return Object.entries(ordersByWeekday).map(([day, count]) => ({
-    day: weekdayNames[parseInt(day)],
-    count,
-  }));
-}
-
-
-// ==================== CHAT PDV ↔ CLIENTE ====================
-
-/**
- * Enviar mensagem no chat
- */
-export async function sendChatMessage(data: {
-  orderId: number;
-  senderId: number;
-  senderType: "customer" | "business";
-  message: string;
-}) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const [result] = await db.insert(chatMessages).values({
-    orderId: data.orderId,
-    senderId: data.senderId,
-    senderType: data.senderType,
-    message: data.message,
-    isRead: false,
-  });
-
-  const messageId = result.insertId;
-
-  // Emitir evento WebSocket de nova mensagem
-  try {
-    const { emitNewChatMessage } = await import("./_core/websocket");
-    emitNewChatMessage(data.orderId, {
-      id: messageId,
-      orderId: data.orderId,
-      senderId: data.senderId,
-      senderType: data.senderType,
-      message: data.message,
-      isRead: false,
-      createdAt: new Date(),
-    });
-  } catch (error) {
-    console.log('[WebSocket] Failed to emit new chat message event:', error);
-  }
-
-  return { success: true, messageId };
-}
-
-/**
- * Buscar mensagens de um pedido
- */
-export async function getChatMessages(orderId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const messages = await db
-    .select()
-    .from(chatMessages)
-    .where(eq(chatMessages.orderId, orderId))
-    .orderBy(chatMessages.createdAt);
-
-  return messages;
-}
-
-/**
- * Marcar mensagens como lidas
- */
-export async function markMessagesAsRead(orderId: number, senderType: "customer" | "business") {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Marcar como lidas as mensagens do outro lado
-  const otherType = senderType === "customer" ? "business" : "customer";
-
-  await db
-    .update(chatMessages)
-    .set({ isRead: true })
-    .where(
-      and(
-        eq(chatMessages.orderId, orderId),
-        eq(chatMessages.senderType, otherType),
-        eq(chatMessages.isRead, false)
-      )
-    );
-
-  return { success: true };
-}
-
-/**
- * Contar mensagens não lidas
- */
-export async function getUnreadCount(orderId: number, forType: "customer" | "business") {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Contar mensagens não lidas do outro lado
-  const otherType = forType === "customer" ? "business" : "customer";
-
-  const messages = await db
-    .select()
-    .from(chatMessages)
-    .where(
-      and(
-        eq(chatMessages.orderId, orderId),
-        eq(chatMessages.senderType, otherType),
-        eq(chatMessages.isRead, false)
-      )
-    );
-
-  return messages.length;
-}
-
-
-// ==================== AVALIAÇÕES ====================
-
-/**
- * Criar avaliação de pedido
- */
-export async function createOrderRating(data: {
-  orderId: number;
-  customerId: number;
-  companyId: number;
-  rating: number;
-  comment?: string;
-}) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Verificar se já existe avaliação para este pedido
-  const existing = await db
-    .select()
-    .from(orderRatings)
-    .where(eq(orderRatings.orderId, data.orderId))
-    .limit(1);
-
-  if (existing.length > 0) {
-    throw new Error("Pedido já foi avaliado");
-  }
-
-  const [result] = await db.insert(orderRatings).values({
-    orderId: data.orderId,
-    customerId: data.customerId,
-    companyId: data.companyId,
-    rating: data.rating,
-    comment: data.comment || null,
-  });
-
-  return { success: true, ratingId: result.insertId };
-}
-
-/**
- * Buscar avaliação de um pedido
- */
-export async function getOrderRating(orderId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const rating = await db
-    .select()
-    .from(orderRatings)
-    .where(eq(orderRatings.orderId, orderId))
-    .limit(1);
-
-  return rating[0] || null;
-}
-
-/**
- * Buscar todas as avaliações de uma empresa
- */
-export async function getCompanyRatings(companyId: number, limit: number = 50) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const ratings = await db
-    .select({
-      id: orderRatings.id,
-      orderId: orderRatings.orderId,
-      rating: orderRatings.rating,
-      comment: orderRatings.comment,
-      createdAt: orderRatings.createdAt,
-      orderNumber: orders.orderNumber,
-      customerName: orders.customerName,
-    })
-    .from(orderRatings)
-    .leftJoin(orders, eq(orderRatings.orderId, orders.id))
-    .where(eq(orderRatings.companyId, companyId))
-    .orderBy(desc(orderRatings.createdAt))
-    .limit(limit);
-
-  return ratings;
-}
-
-/**
- * Calcular média de avaliações de uma empresa
- */
-export async function getCompanyRatingStats(companyId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const ratings = await db
-    .select()
-    .from(orderRatings)
-    .where(eq(orderRatings.companyId, companyId));
-
-  if (ratings.length === 0) {
-    return {
-      totalRatings: 0,
-      averageRating: 0,
-      distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-    };
-  }
-
-  const total = ratings.reduce((sum, r) => sum + r.rating, 0);
-  const average = total / ratings.length;
-
-  const distribution = ratings.reduce((acc, r) => {
-    acc[r.rating as 1 | 2 | 3 | 4 | 5]++;
-    return acc;
-  }, { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<1 | 2 | 3 | 4 | 5, number>);
-
-  return {
-    totalRatings: ratings.length,
-    averageRating: Math.round(average * 10) / 10,
-    distribution,
-  };
-}
-
-// ==================== USUÁRIOS ====================
-
-export async function getUserById(userId: string) {
-  const db = await getDb();
-  if (!db) return null;
-  
-  try {
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, parseInt(userId)))
-      .limit(1);
-    
-    return result.length > 0 ? result[0] : null;
-  } catch (error) {
-    console.log('[Database] Error getting user by id:', error);
-    return null;
-  }
-}
-
-// ==================== DELIVERY E ENTREGADORES PRÓPRIOS ====================
-
-export async function getCompanyDeliverySettings(companyId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) return [];
 
   const result = await db
     .select()
-    .from(companyDeliverySettings)
-    .where(eq(companyDeliverySettings.companyId, companyId))
-    .limit(1);
+    .from(orderItems)
+    .where(eq(orderItems.orderId, orderId));
 
-  if (result.length === 0) {
-    // Retornar configuração padrão se não existir
-    return {
-      id: 0,
-      companyId,
-      isOnPedija: false,
-      isOnlineForOrders: false,
-      hasOwnDrivers: false,
-      maxDrivers: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-  }
-
-  return result[0];
+  return result;
 }
 
-export async function activateCompanyOnPedija(companyId: number) {
+export async function createOrder(data: InsertOrder) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Verificar se já existe configuração
-  const existing = await db
-    .select()
-    .from(companyDeliverySettings)
-    .where(eq(companyDeliverySettings.companyId, companyId))
-    .limit(1);
-
-  if (existing.length > 0) {
-    // Atualizar
-    await db
-      .update(companyDeliverySettings)
-      .set({ isOnPedija: true, updatedAt: new Date() })
-      .where(eq(companyDeliverySettings.companyId, companyId));
-  } else {
-    // Inserir
-    await db.insert(companyDeliverySettings).values({
-      companyId,
-      isOnPedija: true,
-      isOnlineForOrders: false,
-      hasOwnDrivers: false,
-      maxDrivers: 0,
-    });
-  }
-
-  return { success: true };
+  const result = await db.insert(orders).values(data);
+  return result;
 }
 
-export async function deactivateCompanyFromPedija(companyId: number) {
+export async function updateOrderStatus(orderId: number, status: string) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db
-    .update(companyDeliverySettings)
-    .set({ isOnPedija: false, isOnlineForOrders: false, updatedAt: new Date() })
-    .where(eq(companyDeliverySettings.companyId, companyId));
-
-  return { success: true };
-}
-
-export async function toggleCompanyOnlineStatus(companyId: number, isOnline: boolean) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Verificar se empresa está no PediJá
-  const settings = await getCompanyDeliverySettings(companyId);
-  if (!settings.isOnPedija) {
-    throw new Error('Empresa precisa estar ativa no PediJá');
-  }
-
-  await db
-    .update(companyDeliverySettings)
-    .set({ isOnlineForOrders: isOnline, updatedAt: new Date() })
-    .where(eq(companyDeliverySettings.companyId, companyId));
-
-  return { success: true, isOnline };
-}
-
-export async function getOnlineCompaniesForDelivery(cityId?: number, neighborhood?: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Buscar empresas online
-  const conditions = [
-    eq(companyDeliverySettings.isOnPedija, true),
-    eq(companyDeliverySettings.isOnlineForOrders, true),
-  ];
-
-  const onlineSettings = await db
-    .select()
-    .from(companyDeliverySettings)
-    .where(and(...conditions));
-
-  const companyIds = onlineSettings.map(s => s.companyId);
-  if (companyIds.length === 0) return [];
-
-  // Buscar dados das empresas
-  // Nota: filtros de cityId e neighborhood devem ser implementados quando os campos existirem no schema
-  const companiesList = await db
-    .select()
-    .from(companies)
-    .where(sql`${companies.id} IN (${companyIds.join(', ')})`);
-
-  return companiesList;
-}
-
-export async function addCompanyDriver(companyId: number, driverId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Verificar se empresa tem permissão para entregadores próprios
-  const settings = await getCompanyDeliverySettings(companyId);
-  if (!settings.hasOwnDrivers) {
-    throw new Error('Empresa não tem permissão para entregadores próprios');
-  }
-
-  // Verificar limite de entregadores
-  const currentDrivers = await db
-    .select()
-    .from(companyDrivers)
-    .where(and(
-      eq(companyDrivers.companyId, companyId),
-      eq(companyDrivers.isActive, true)
-    ));
-
-  if (currentDrivers.length >= settings.maxDrivers) {
-    throw new Error(`Limite de ${settings.maxDrivers} entregadores atingido`);
-  }
-
-  // Adicionar entregador
-  await db.insert(companyDrivers).values({
-    companyId,
-    driverId,
-    isActive: true,
-  });
-
-  return { success: true };
-}
-
-export async function removeCompanyDriver(companyId: number, driverId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db
-    .update(companyDrivers)
-    .set({ isActive: false })
-    .where(and(
-      eq(companyDrivers.companyId, companyId),
-      eq(companyDrivers.driverId, driverId)
-    ));
-
-  return { success: true };
-}
-
-export async function getCompanyDrivers(companyId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const drivers = await db
-    .select({
-      id: companyDrivers.id,
-      driverId: companyDrivers.driverId,
-      driverName: users.name,
-      driverEmail: users.email,
-      isActive: companyDrivers.isActive,
-      createdAt: companyDrivers.createdAt,
-    })
-    .from(companyDrivers)
-    .innerJoin(users, eq(companyDrivers.driverId, users.id))
-    .where(eq(companyDrivers.companyId, companyId));
-
-  return drivers;
-}
-
-export async function getOrdersForCompanyDriver(driverId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Buscar empresa do entregador
-  const driverCompany = await db
-    .select()
-    .from(companyDrivers)
-    .where(and(
-      eq(companyDrivers.driverId, driverId),
-      eq(companyDrivers.isActive, true)
-    ))
-    .limit(1);
-
-  if (driverCompany.length === 0) {
-    return [];
-  }
-
-  const companyId = driverCompany[0].companyId;
-
-  // Buscar pedidos da empresa
-  const ordersList = await db
-    .select()
-    .from(orders)
-    .where(and(
-      eq(orders.companyId, companyId),
-      sql`${orders.status} IN ('accepted', 'preparing', 'ready', 'out_for_delivery')`
-    ))
-    .orderBy(desc(orders.createdAt));
-
-  return ordersList;
-}
-
-export async function upsertCompanyDeliverySettings(data: {
-  companyId: number;
-  hasOwnDrivers: boolean;
-  maxDrivers: number;
-}) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  // Verificar se já existe
-  const existing = await db
-    .select()
-    .from(companyDeliverySettings)
-    .where(eq(companyDeliverySettings.companyId, data.companyId))
-    .limit(1);
-
-  if (existing.length > 0) {
-    // Atualizar
-    await db
-      .update(companyDeliverySettings)
-      .set({
-        hasOwnDrivers: data.hasOwnDrivers,
-        maxDrivers: data.maxDrivers,
-        updatedAt: new Date(),
-      })
-      .where(eq(companyDeliverySettings.companyId, data.companyId));
-  } else {
-    // Inserir
-    await db.insert(companyDeliverySettings).values({
-      companyId: data.companyId,
-      isOnPedija: false,
-      isOnlineForOrders: false,
-      hasOwnDrivers: data.hasOwnDrivers,
-      maxDrivers: data.maxDrivers,
-    });
-  }
-
-  return { success: true };
-}
-
-// ==================== GERENCIAMENTO DE INTEGRAÇÕES EXTERNAS ====================
-
-/**
- * Criar ou atualizar integração com plataforma externa
- */
-export async function upsertExternalPlatformIntegration(data: {
-  companyId: number;
-  platform: "pedija" | "iffod" | "99food" | "rappi" | "uber_eats" | "ifood" | "other";
-  apiKey?: string;
-  apiSecret?: string;
-  webhookSecret?: string;
-  settings?: {
-    autoAccept?: boolean;
-    autoPrint?: boolean;
-    notificationSound?: boolean;
-    [key: string]: any;
-  };
-  isActive?: boolean;
-}) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const existing = await db
-    .select()
-    .from(externalPlatformIntegrations)
-    .where(
-      and(
-        eq(externalPlatformIntegrations.companyId, data.companyId),
-        eq(externalPlatformIntegrations.platform, data.platform)
-      )
-    )
-    .limit(1);
-
-  const updateData: any = {
-    updatedAt: new Date(),
-  };
-
-  if (data.apiKey !== undefined) updateData.apiKey = data.apiKey;
-  if (data.apiSecret !== undefined) updateData.apiSecret = data.apiSecret;
-  if (data.webhookSecret !== undefined) updateData.webhookSecret = data.webhookSecret;
-  if (data.settings !== undefined) updateData.settings = data.settings;
-  if (data.isActive !== undefined) updateData.isActive = data.isActive;
-
-  if (existing.length > 0) {
-    await db
-      .update(externalPlatformIntegrations)
-      .set(updateData)
-      .where(eq(externalPlatformIntegrations.id, existing[0].id));
-  } else {
-    await db.insert(externalPlatformIntegrations).values({
-      companyId: data.companyId,
-      platform: data.platform,
-      apiKey: data.apiKey || null,
-      apiSecret: data.apiSecret || null,
-      webhookSecret: data.webhookSecret || null,
-      settings: data.settings || {},
-      isActive: data.isActive !== undefined ? data.isActive : true,
-    });
-  }
-
-  return { success: true };
-}
-
-/**
- * Listar integrações ativas de uma empresa
- */
-export async function getExternalPlatformIntegrations(companyId: number) {
-  const db = await getDb();
-  if (!db) return [];
-
-  return await db
-    .select()
-    .from(externalPlatformIntegrations)
-    .where(eq(externalPlatformIntegrations.companyId, companyId))
-    .orderBy(desc(externalPlatformIntegrations.updatedAt));
-}
-
-/**
- * Ativar/desativar integração
- */
-export async function toggleExternalPlatformIntegration(
-  companyId: number,
-  platform: string,
-  isActive: boolean
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db
-    .update(externalPlatformIntegrations)
-    .set({ isActive, updatedAt: new Date() })
-    .where(
-      and(
-        eq(externalPlatformIntegrations.companyId, companyId),
-        eq(externalPlatformIntegrations.platform, platform as any)
-      )
-    );
-
-  return { success: true };
-}
-
-// ==================== CÉREBRO BUSCAZAP (IA / Conversas / CRM) ====================
-
-/**
- * Configurações de IA da empresa (company_ai_settings).
- * Usado para saber se o chat com IA está habilitado para essa empresa (plano destaque+ ou serviço IA separado).
- */
-export async function getCompanyAiSettings(companyId: number) {
-  const db = await getDb();
-  if (!db) return null;
-  const rows = await db
-    .select()
-    .from(companyAiSettings)
-    .where(eq(companyAiSettings.companyId, companyId))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-/**
- * Cria ou atualiza company_ai_settings para a empresa.
- * Usado pelo painel da empresa (app/PDV) ao ativar e salvar "Configurar assistente / Treinamento inicial do bot".
- */
-export async function upsertCompanyAiSettings(
-  companyId: number,
-  data: {
-    aiEnabled: boolean;
-    autoResponseEnabled?: boolean;
-    escalateToHumanEnabled?: boolean;
-    personality?: "professional" | "friendly" | "casual" | "formal";
-    language?: string;
-    customGreeting?: string | null;
-    customInstructions?: string | null;
-    businessHours?: {
-      enabled: boolean;
-      schedule?: { [day: string]: { open: string; close: string } | null };
-      outsideHoursMessage?: string;
-    } | null;
-    maxMessagesPerDay?: number;
-  }
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const existing = await getCompanyAiSettings(companyId);
-  const payload = {
-    aiEnabled: data.aiEnabled,
-    autoResponseEnabled: data.autoResponseEnabled ?? true,
-    escalateToHumanEnabled: data.escalateToHumanEnabled ?? true,
-    personality: (data.personality ?? "friendly") as "professional" | "friendly" | "casual" | "formal",
-    language: data.language ?? "pt-BR",
-    customGreeting: data.customGreeting ?? null,
-    customInstructions: data.customInstructions ?? null,
-    businessHours: data.businessHours ?? null,
-    maxMessagesPerDay: data.maxMessagesPerDay ?? 1000,
-    updatedAt: new Date(),
-  };
-
-  if (existing) {
-    await db
-      .update(companyAiSettings)
-      .set(payload)
-      .where(eq(companyAiSettings.companyId, companyId));
-    return existing.id;
-  }
-
-  const [row] = await db.insert(companyAiSettings).values({
-    companyId,
-    ...payload,
-  });
-  return row.insertId;
-}
-
-export type ConversationChannel = "whatsapp" | "app" | "web" | "telegram";
-export type MessageRole = "customer" | "assistant" | "human" | "system";
-
-/**
- * Obter ou criar conversa por empresa + telefone do cliente
- */
-export async function getOrCreateConversation(
-  companyId: number,
-  customerPhone: string,
-  channel: ConversationChannel = "app",
-  customerName?: string
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const normalized = customerPhone.replace(/\D/g, "").slice(-11) || customerPhone;
-  const existing = await db
-    .select()
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.companyId, companyId),
-        eq(conversations.customerPhone, normalized),
-        eq(conversations.channel, channel)
-      )
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return existing[0];
-  }
-
-  await db.insert(conversations).values({
-    companyId,
-    customerPhone: normalized,
-    customerName: customerName ?? null,
-    channel,
-    status: "active",
-    aiEnabled: true,
-    lastMessageAt: new Date(),
-  });
-
-  const created = await db
-    .select()
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.companyId, companyId),
-        eq(conversations.customerPhone, normalized),
-        eq(conversations.channel, channel)
-      )
-    )
-    .limit(1);
-
-  return created[0]!;
-}
-
-/**
- * Adicionar mensagem à conversa (para histórico da IA)
- */
-export async function addMessageToConversation(
-  conversationId: number,
-  companyId: number,
-  role: MessageRole,
-  content: string,
-  channel: ConversationChannel = "app",
-  aiMetadata?: {
-    intent?: string;
-    leadScore?: number;
-    tags?: string[];
-    products?: string[];
-    nextAction?: string;
-    crmUpdate?: { name?: string; interest?: string; budget?: string; city?: string };
-  }
-) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  await db.insert(messages).values({
-    conversationId,
-    companyId,
-    role,
-    content,
-    channel,
-    aiMetadata: aiMetadata ?? undefined,
-  });
-
-  await db
-    .update(conversations)
-    .set({ lastMessageAt: new Date() })
-    .where(eq(conversations.id, conversationId));
-}
-
-/**
- * Listar mensagens da conversa (para contexto da IA)
- */
-export async function getConversationMessages(conversationId: number, limit = 50) {
-  const db = await getDb();
-  if (!db) return [];
-
-  return await db
-    .select({ id: messages.id, role: messages.role, content: messages.content, createdAt: messages.createdAt })
-    .from(messages)
-    .where(eq(messages.conversationId, conversationId))
-    .orderBy(desc(messages.createdAt))
-    .limit(limit);
-}
-
-/**
- * Base de conhecimento da empresa para o prompt da IA (cardápio, FAQs, etc.)
- */
-export async function getCompanyKnowledgeForBrain(companyId: number): Promise<string> {
-  const db = await getDb();
-  if (!db) return "";
-
-  const rows = await db
-    .select({ content: companyKnowledgeBase.content, title: companyKnowledgeBase.title })
-    .from(companyKnowledgeBase)
-    .where(
-      and(eq(companyKnowledgeBase.companyId, companyId), eq(companyKnowledgeBase.isActive, true))
-    );
-
-  if (rows.length === 0) return "";
-  return rows.map((r) => `[${r.title}]\n${r.content}`).join("\n\n");
-}
-
-/**
- * Resumo de comportamento do usuário para o prompt (horários, categorias, pedidos)
- */
-export async function getUserBehaviorSummaryForBrain(companyId: number, customerPhone: string): Promise<string> {
-  const db = await getDb();
-  if (!db) return "";
-
-  const normalized = customerPhone.replace(/\D/g, "").slice(-11) || customerPhone;
-
-  const rows = await db
-    .select({
-      action: userBehavior.action,
-      category: userBehavior.category,
-      dayOfWeek: userBehavior.dayOfWeek,
-      hourOfDay: userBehavior.hourOfDay,
-      value: userBehavior.value,
-      createdAt: userBehavior.createdAt,
-    })
-    .from(userBehavior)
-    .where(
-      and(
-        eq(userBehavior.companyId, companyId),
-        eq(userBehavior.customerPhone, normalized)
-      )
-    )
-    .orderBy(desc(userBehavior.createdAt))
-    .limit(100);
-
-  if (rows.length === 0) return "";
-
-  const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  const parts: string[] = [];
-  const byDay: Record<number, number> = {};
-  const byHour: Record<number, number> = {};
-  const categories: string[] = [];
-
-  for (const r of rows) {
-    byDay[r.dayOfWeek] = (byDay[r.dayOfWeek] ?? 0) + 1;
-    byHour[r.hourOfDay] = (byHour[r.hourOfDay] ?? 0) + 1;
-    if (r.category && !categories.includes(r.category)) categories.push(r.category);
-  }
-
-  const topDays = Object.entries(byDay)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([d]) => dayNames[Number(d)]);
-  const topHours = Object.entries(byHour)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([h]) => `${h}h`);
-
-  if (topDays.length) parts.push(`Dias mais ativos: ${topDays.join(", ")}`);
-  if (topHours.length) parts.push(`Horários preferidos: ${topHours.join(", ")}`);
-  if (categories.length) parts.push(`Categorias de interesse: ${categories.slice(0, 5).join(", ")}`);
-  parts.push(`Total de interações: ${rows.length}`);
-
-  return parts.join(". ");
-}
-
-/**
- * Atualizar ou criar contato no CRM a partir do bloco <DATA> da IA
- */
-export async function upsertCrmFromDataBlock(
-  companyId: number,
-  customerPhone: string,
-  dataBlock: {
-    lead_score?: number;
-    tags?: string[];
-    crm_update?: { name?: string; interest?: string; budget?: string; city?: string };
-  }
-) {
-  const db = await getDb();
-  if (!db) return;
-
-  const normalized = customerPhone.replace(/\D/g, "").slice(-11) || customerPhone;
-  const now = new Date();
-
-  const existing = await db
-    .select()
-    .from(crmContacts)
-    .where(
-      and(eq(crmContacts.companyId, companyId), eq(crmContacts.phone, normalized))
-    )
-    .limit(1);
-
-  const tags = dataBlock.tags ?? [];
-  const score = Math.min(100, Math.max(0, dataBlock.lead_score ?? 0));
-  const crm = dataBlock.crm_update ?? {};
-
-  if (existing.length > 0) {
-    const prev = existing[0];
-    const prevTags = (prev.tags as string[] | null) ?? [];
-    const mergedTags = [...new Set([...prevTags, ...tags])];
-    await db
-      .update(crmContacts)
-      .set({
-        leadScore: score > (prev.leadScore ?? 0) ? score : prev.leadScore,
-        tags: JSON.stringify(mergedTags),
-        name: (crm.name && crm.name.trim()) ? crm.name.trim() : prev.name,
-        lastContactAt: now,
-        conversationsCount: (prev.conversationsCount ?? 0) + 1,
-        updatedAt: now,
-      })
-      .where(eq(crmContacts.id, prev.id));
+  if (!db) {
+    console.warn("[Database] updateOrderStatus skipped: database not available");
     return;
   }
 
-  await db.insert(crmContacts).values({
-    companyId,
-    phone: normalized,
-    name: crm.name ?? null,
-    leadScore: score,
-    tags: JSON.stringify(tags),
-    firstContactAt: now,
-    lastContactAt: now,
-    conversationsCount: 1,
-  });
+  await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, orderId));
 }
 
-/**
- * Registrar comportamento do usuário (para recomendações futuras)
- */
-export async function trackUserBehavior(
-  companyId: number,
-  customerPhone: string,
-  action: "message" | "order" | "quote" | "click" | "view" | "search" | "rating",
-  category?: string,
-  productId?: number,
-  value?: number
-) {
-  const db = await getDb();
-  if (!db) return;
+// ========== STOCK QUERIES ==========
 
-  const normalized = customerPhone.replace(/\D/g, "").slice(-11) || customerPhone;
-  const now = new Date();
-  const dayOfWeek = now.getDay();
-  const hourOfDay = now.getHours();
-
-  await db.insert(userBehavior).values({
-    companyId,
-    customerPhone: normalized,
-    action,
-    category: category ?? null,
-    productId: productId ?? null,
-    value: value != null ? String(value) : null,
-    dayOfWeek,
-    hourOfDay,
-  });
-}
-
-// ==================== NOTIFICATION QUEUE ====================
-
-export type NotificationQueueType = "recommendation" | "promotion" | "reminder" | "follow_up" | "upsell";
-export type NotificationQueueChannel = "whatsapp" | "push" | "sms";
-
-export async function enqueueNotification(data: {
-  companyId: number;
-  customerPhone: string;
-  type: NotificationQueueType;
-  message: string;
-  channel?: NotificationQueueChannel;
-  scheduledFor?: Date;
-  metadata?: { triggeredBy?: string; productId?: number; orderId?: number };
-}): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const [row] = await db.insert(notificationQueue).values({
-    companyId: data.companyId,
-    customerPhone: data.customerPhone.replace(/\D/g, "").slice(-11) || data.customerPhone,
-    type: data.type,
-    channel: data.channel ?? "whatsapp",
-    message: data.message,
-    scheduledFor: data.scheduledFor ?? new Date(),
-    status: "pending",
-    metadata: data.metadata ?? undefined,
-  });
-  return row.insertId;
-}
-
-/** Listar contatos do CRM por empresa (painel BuscaZap IA). */
-export async function getCrmContactsByCompany(companyId: number, limit = 100) {
+export async function getStockBySellerIdWithProducts(sellerId: number) {
   const db = await getDb();
   if (!db) return [];
-  return await db
+
+  const result = await db
+    .select({
+      id: stock.id,
+      productId: stock.productId,
+      quantity: stock.quantity,
+      minThreshold: stock.minThreshold,
+      productName: products.name,
+      productSku: products.sku,
+      productPrice: products.price,
+      createdAt: stock.createdAt,
+      updatedAt: stock.updatedAt,
+    })
+    .from(stock)
+    .innerJoin(products, eq(stock.productId, products.id))
+    .where(eq(products.sellerId, sellerId))
+    .orderBy(desc(stock.updatedAt));
+
+  return result;
+}
+
+export async function updateStockQuantity(productId: number, quantity: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(stock).set({ quantity, updatedAt: new Date() }).where(eq(stock.productId, productId));
+}
+
+// ========== TRANSACTION QUERIES ==========
+
+export async function getTransactionsBySellerIdForReports(sellerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db
     .select()
-    .from(crmContacts)
-    .where(eq(crmContacts.companyId, companyId))
-    .orderBy(desc(crmContacts.lastContactAt))
-    .limit(limit);
-}
+    .from(transactions)
+    .where(eq(transactions.sellerId, sellerId))
+    .orderBy(desc(transactions.createdAt));
 
-/** Métricas para dashboard (conversas, leads, conversão) por empresa e período. */
-export async function getCompanyMetricsForDashboard(
-  companyId: number,
-  period: "today" | "week" | "month"
-): Promise<{
-  conversationsStarted: number;
-  messagesReceived: number;
-  messagesSent: number;
-  newLeads: number;
-  hotLeads: number;
-  ordersCreated: number;
-  conversionRate: number;
-  byDate: Array<{ date: string; conversations: number; orders: number }>;
-}> {
-  const db = await getDb();
-  if (!db) {
-    return {
-      conversationsStarted: 0,
-      messagesReceived: 0,
-      messagesSent: 0,
-      newLeads: 0,
-      hotLeads: 0,
-      ordersCreated: 0,
-      conversionRate: 0,
-      byDate: [],
-    };
-  }
-  const empty = {
-    conversationsStarted: 0,
-    messagesReceived: 0,
-    messagesSent: 0,
-    newLeads: 0,
-    hotLeads: 0,
-    ordersCreated: 0,
-    conversionRate: 0,
-    byDate: [] as Array<{ date: string; conversations: number; orders: number }>,
-  };
-
-  try {
-    const now = new Date();
-    let start = new Date();
-    if (period === "today") start.setHours(0, 0, 0, 0);
-    else if (period === "week") start.setDate(now.getDate() - 7);
-    else start.setDate(now.getDate() - 30);
-
-    const convs = await db.select().from(conversations).where(and(eq(conversations.companyId, companyId), gte(conversations.createdAt, start)));
-    const msgs = await db.select().from(messages).where(and(eq(messages.companyId, companyId), gte(messages.createdAt, start)));
-    const contacts = await db.select().from(crmContacts).where(and(eq(crmContacts.companyId, companyId), gte(crmContacts.firstContactAt, start)));
-    const hotLeads = contacts.filter((c) => (c.leadScore ?? 0) >= 70).length;
-    const ordersList = await db.select().from(orders).where(and(eq(orders.companyId, companyId), eq(orders.source, "buscazap"), gte(orders.createdAt, start)));
-    const ordersCreated = ordersList.filter((o) => o.status !== "cancelled").length;
-    const conversionRate = convs.length > 0 ? Math.round((ordersCreated / convs.length) * 10000) / 100 : 0;
-
-    const received = msgs.filter((m) => m.role === "customer").length;
-    const sent = msgs.filter((m) => m.role === "assistant" || m.role === "human").length;
-
-    const byDate: Array<{ date: string; conversations: number; orders: number }> = [];
-    const dayMap: Record<string, { conversations: number; orders: number }> = {};
-    for (const c of convs) {
-      const d = new Date(c.createdAt).toISOString().slice(0, 10);
-      if (!dayMap[d]) dayMap[d] = { conversations: 0, orders: 0 };
-      dayMap[d].conversations++;
-    }
-    for (const o of ordersList) {
-      if (o.status === "cancelled") continue;
-      const d = new Date(o.createdAt).toISOString().slice(0, 10);
-      if (!dayMap[d]) dayMap[d] = { conversations: 0, orders: 0 };
-      dayMap[d].orders++;
-    }
-    for (const [date, v] of Object.entries(dayMap)) byDate.push({ date, ...v });
-    byDate.sort((a, b) => a.date.localeCompare(b.date));
-
-    return {
-      conversationsStarted: convs.length,
-      messagesReceived: received,
-      messagesSent: sent,
-      newLeads: contacts.length,
-      hotLeads,
-      ordersCreated,
-      conversionRate,
-      byDate,
-    };
-  } catch (err) {
-    console.error("[getCompanyMetricsForDashboard] Erro ao buscar métricas (tabelas conversations/messages/crm_contacts podem não existir):", err);
-    return empty;
-  }
-}
-
-/** Telefones de clientes ativos (últimos 90 dias) para promoções em massa. */
-export async function getActiveCustomerPhones(companyId: number): Promise<string[]> {
-  const db = await getDb();
-  if (!db) return [];
-  const since = new Date();
-  since.setDate(since.getDate() - 90);
-  const rows = await db
-    .select({ customerPhone: conversations.customerPhone })
-    .from(conversations)
-    .where(and(eq(conversations.companyId, companyId), gte(conversations.lastMessageAt, since)));
-  const set = new Set(rows.map((r) => r.customerPhone));
-  return Array.from(set);
-}
-
-/** Inserir conhecimento na base (PDF/texto) para treinar IA. */
-export async function addCompanyKnowledge(
-  companyId: number,
-  type: "pdf" | "website" | "product" | "faq" | "instagram" | "manual",
-  title: string,
-  content: string,
-  sourceUrl?: string
-): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const [row] = await db.insert(companyKnowledgeBase).values({
-    companyId,
-    type,
-    title,
-    content: content.slice(0, 65535),
-    sourceUrl: sourceUrl ?? null,
-    isActive: true,
-  });
-  return row.insertId;
-}
-
-// ============================================================
-// Upsells — funções de banco de dados
-// ============================================================
-
-/** Lista todos os upsells do catálogo (ativos). */
-export async function listUpsellCatalog() {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(upsellCatalog).where(eq(upsellCatalog.isActive, true)).orderBy(upsellCatalog.sortOrder);
-}
-
-/** Lista os upsells ativos de uma empresa. */
-export async function getCompanyUpsells(companyId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(companyUpsells).where(
-    and(eq(companyUpsells.companyId, companyId), eq(companyUpsells.status, "active"))
-  );
-}
-
-/** Verifica se uma empresa tem um upsell específico ativo. */
-export async function companyHasUpsell(companyId: number, slug: string): Promise<boolean> {
-  const db = await getDb();
-  if (!db) return false;
-  const rows = await db.select({ id: companyUpsells.id }).from(companyUpsells).where(
-    and(
-      eq(companyUpsells.companyId, companyId),
-      eq(companyUpsells.upsellSlug, slug),
-      eq(companyUpsells.status, "active")
-    )
-  ).limit(1);
-  return rows.length > 0;
-}
-
-/** Ativa (ou reativa) um upsell para uma empresa. */
-export async function activateCompanyUpsell(companyId: number, slug: string, pricePaid: number = 0) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  // Upsert: se já existe, reativa; se não, cria
-  const existing = await db.select().from(companyUpsells).where(
-    and(eq(companyUpsells.companyId, companyId), eq(companyUpsells.upsellSlug, slug))
-  ).limit(1);
-  if (existing.length > 0) {
-    await db.update(companyUpsells)
-      .set({ status: "active", pricePaid: String(pricePaid), activatedAt: new Date(), cancelledAt: null })
-      .where(and(eq(companyUpsells.companyId, companyId), eq(companyUpsells.upsellSlug, slug)));
-  } else {
-    await db.insert(companyUpsells).values({
-      companyId,
-      upsellSlug: slug,
-      status: "active",
-      pricePaid: String(pricePaid),
-    });
-  }
-}
-
-/** Cancela um upsell de uma empresa. */
-export async function cancelCompanyUpsell(companyId: number, slug: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.update(companyUpsells)
-    .set({ status: "cancelled", cancelledAt: new Date() })
-    .where(and(eq(companyUpsells.companyId, companyId), eq(companyUpsells.upsellSlug, slug)));
+  return result;
 }

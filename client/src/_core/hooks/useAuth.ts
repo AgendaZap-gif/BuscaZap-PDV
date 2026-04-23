@@ -38,27 +38,30 @@ export function useAuth(options?: UseAuthOptions) {
     } finally {
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
+      // Redirect to login page after logout
+      setTimeout(() => {
+        window.location.href = redirectPath;
+      }, 100);
     }
-  }, [logoutMutation, utils]);
+  }, [logoutMutation, utils, redirectPath]);
 
-  const state = useMemo(() => {
-    localStorage.setItem(
-      "buscazap-user-info",
-      JSON.stringify(meQuery.data)
-    );
-    return {
+  useEffect(() => {
+    try {
+      localStorage.setItem("manus-runtime-user-info", JSON.stringify(meQuery.data ?? null));
+    } catch {
+      /* ignore */
+    }
+  }, [meQuery.data]);
+
+  const state = useMemo(
+    () => ({
       user: meQuery.data ?? null,
       loading: meQuery.isLoading || logoutMutation.isPending,
       error: meQuery.error ?? logoutMutation.error ?? null,
       isAuthenticated: Boolean(meQuery.data),
-    };
-  }, [
-    meQuery.data,
-    meQuery.error,
-    meQuery.isLoading,
-    logoutMutation.error,
-    logoutMutation.isPending,
-  ]);
+    }),
+    [meQuery.data, meQuery.error, meQuery.isLoading, logoutMutation.error, logoutMutation.isPending]
+  );
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;

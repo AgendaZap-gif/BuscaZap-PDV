@@ -5,6 +5,7 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
+import { getLoginUrl } from "./const";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -17,9 +18,7 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  // Redireciona para a Home do PDV, onde o usuário pode escolher
-  // entre login por e-mail/senha ou login com Google.
-  window.location.href = "/";
+  window.location.href = getLoginUrl();
 };
 
 queryClient.getQueryCache().subscribe(event => {
@@ -44,13 +43,9 @@ const trpcClient = trpc.createClient({
       url: "/api/trpc",
       transformer: superjson,
       fetch(input, init) {
-        const headers = new Headers(init?.headers);
-        const companyToken = typeof window !== "undefined" ? localStorage.getItem("buscazap_company_token") : null;
-        if (companyToken) headers.set("Authorization", `Bearer ${companyToken}`);
         return globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",
-          headers,
         });
       },
     }),

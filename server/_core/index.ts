@@ -3,14 +3,12 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerGoogleOAuthRoutes } from "./googleOAuth";
-import { registerLocalAuthRoutes } from "./localAuth";
+import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { initializeWebSocket } from "./websocket";
-import { startCrons } from "./crons";
-import { detectCompanyByDomain } from "./domainMiddleware";
+import { setupSocketIO } from "./socket";
+import pedijaWebhookRoutes from "../pedija-webhook";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -34,14 +32,18 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  app.use(detectCompanyByDomain);
-  registerStripeWebhook(app);
-  registerAgendaWebhook(app);
+  
+  // Setup Socket.io
+  const socketIO = setupSocketIO(server);
+  
+  // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  registerGoogleOAuthRoutes(app);
-  // Local auth routes (email/password)
-  registerLocalAuthRoutes(app);
+  // OAuth callback under /api/oauth/callback
+  registerOAuthRoutes(app);
+
+  // Webhook receiver para pedidos Pedijá vindos do BuscaZap
+  app.use("/api/pedija", pedijaWebhookRoutes);
   // tRPC API
   app.use(
     "/api/trpc",
@@ -50,6 +52,9 @@ async function startServer() {
       createContext,
     })
   );
+  
+  // Make Socket.io available globally for use in procedures
+  (global as any).socketIO = socketIO;
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
@@ -64,69 +69,9 @@ async function startServer() {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
-  // Inicializar WebSocket
-  initializeWebSocket(server);
-
-  startCrons();
-
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
-}
-
-function registerAgendaWebhook(app: express.Express) {
-  app.post("/api/agenda/confirmation-webhook", express.json(), async (req: express.Request, res: express.Response) => {
-    try {
-      const { handleConfirmationWebhook } = await import("./salebotAgenda.js");
-      const result = await handleConfirmationWebhook(req.body || {});
-      res.status(200).json(result);
-    } catch (e) {
-      console.warn("[Agenda] Confirmation webhook error:", e);
-      res.status(500).json({ ok: false });
-    }
-  });
-}
-
-function registerStripeWebhook(app: express.Express) {
-  app.post(
-    "/api/stripe/webhook",
-    express.raw({ type: "application/json" }),
-    async (req: express.Request, res: express.Response) => {
-      const sig = req.headers["stripe-signature"] as string;
-      if (!sig) {
-        res.status(400).send("Missing stripe-signature");
-        return;
-      }
-      try {
-        const { constructWebhookEvent } = await import("./stripeService.js");
-        const rawBody = (req as unknown as { body: Buffer }).body;
-        const event = constructWebhookEvent(rawBody, sig);
-        const db = await import("../db.js").then((m) => m.getDb());
-        if (!db) {
-          res.status(500).send("Database not available");
-          return;
-        }
-        const { subscriptions } = await import("../../drizzle/schema.js");
-        const { eq } = await import("drizzle-orm");
-        const e = event as { type: string; data?: { object?: { client_reference_id?: string } } };
-        if (e.type === "checkout.session.completed" && e.data?.object?.client_reference_id) {
-          const companyId = parseInt(e.data.object.client_reference_id, 10);
-          const plan = (e.data.object as { metadata?: { plan?: string } }).metadata?.plan ?? "pro";
-          const limit = plan === "premium" ? 20000 : 5000;
-          await db.update(subscriptions).set({
-            planType: plan === "premium" ? "premium" : "basico",
-            status: "active",
-            messagesLimit: limit,
-            updatedAt: new Date(),
-          }).where(eq(subscriptions.companyId, companyId));
-        }
-        res.status(200).send();
-      } catch (err) {
-        console.warn("[Stripe] Webhook error:", err);
-        res.status(400).send("Webhook error");
-      }
-    }
-  );
 }
 
 startServer().catch(console.error);

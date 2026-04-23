@@ -1,1 +1,0 @@
-ALTER TABLE `orders` ADD `source` enum('pdv','buscazap') DEFAULT 'pdv' NOT NULL;

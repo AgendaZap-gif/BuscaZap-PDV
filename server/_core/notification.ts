@@ -1,78 +1,114 @@
-/**
- * Notificações para o dono da empresa (WhatsApp, push, etc.).
- * Se WHATSAPP_TOKEN e PHONE_ID estiverem configurados, envia via WhatsApp Cloud API.
- */
+import { TRPCError } from "@trpc/server";
+import { ENV } from "./env";
 
-import axios from "axios";
-import { ENV } from "./env.js";
-
-export interface NotificationPayload {
+export type NotificationPayload = {
   title: string;
   content: string;
-  userId?: string;
-}
+};
 
-export interface NotifyOwnerPayload {
-  companyId: number;
-  title: string;
-  content: string;
-  /** Telefone do dono (opcional; se não passar, tenta buscar da empresa). */
-  ownerPhone?: string;
-}
+const TITLE_MAX_LENGTH = 1200;
+const CONTENT_MAX_LENGTH = 20000;
 
-function isWhatsAppConfigured(): boolean {
-  return Boolean(ENV.whatsappToken?.trim() && ENV.whatsappPhoneId?.trim());
-}
+const trimValue = (value: string): string => value.trim();
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
+const buildEndpointUrl = (baseUrl: string): string => {
+  const normalizedBase = baseUrl.endsWith("/")
+    ? baseUrl
+    : `${baseUrl}/`;
+  return new URL(
+    "webdevtoken.v1.WebDevService/SendNotification",
+    normalizedBase
+  ).toString();
+};
+
+const validatePayload = (input: NotificationPayload): NotificationPayload => {
+  if (!isNonEmptyString(input.title)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Notification title is required.",
+    });
+  }
+  if (!isNonEmptyString(input.content)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Notification content is required.",
+    });
+  }
+
+  const title = trimValue(input.title);
+  const content = trimValue(input.content);
+
+  if (title.length > TITLE_MAX_LENGTH) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Notification title must be at most ${TITLE_MAX_LENGTH} characters.`,
+    });
+  }
+
+  if (content.length > CONTENT_MAX_LENGTH) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Notification content must be at most ${CONTENT_MAX_LENGTH} characters.`,
+    });
+  }
+
+  return { title, content };
+};
 
 /**
- * Envia notificação para o dono da empresa.
- * Se ownerPhone ou company.phone estiver disponível e WhatsApp configurado, envia mensagem.
+ * Dispatches a project-owner notification through the Manus Notification Service.
+ * Returns `true` if the request was accepted, `false` when the upstream service
+ * cannot be reached (callers can fall back to email/slack). Validation errors
+ * bubble up as TRPC errors so callers can fix the payload.
  */
-export async function notifyOwner(payload: NotifyOwnerPayload): Promise<boolean> {
-  const { companyId, title, content, ownerPhone } = payload;
-  const phone = ownerPhone ?? await getCompanyPhone(companyId);
-  if (!phone) {
-    console.warn("[Notification] notifyOwner: no phone for company", companyId);
-    return false;
+export async function notifyOwner(
+  payload: NotificationPayload
+): Promise<boolean> {
+  const { title, content } = validatePayload(payload);
+
+  if (!ENV.forgeApiUrl) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Notification service URL is not configured.",
+    });
   }
-  if (!isWhatsAppConfigured()) {
-    console.warn("[Notification] notifyOwner: WhatsApp not configured. Would send:", { title, content, phone });
-    return false;
+
+  if (!ENV.forgeApiKey) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Notification service API key is not configured.",
+    });
   }
+
+  const endpoint = buildEndpointUrl(ENV.forgeApiUrl);
+
   try {
-    const normalized = phone.replace(/\D/g, "").replace(/^0/, "55");
-    await axios.post(
-      `https://graph.facebook.com/v21.0/${ENV.whatsappPhoneId}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to: normalized,
-        type: "text",
-        text: { body: `${title}\n\n${content}` },
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        authorization: `Bearer ${ENV.forgeApiKey}`,
+        "content-type": "application/json",
+        "connect-protocol-version": "1",
       },
-      {
-        headers: {
-          Authorization: `Bearer ${ENV.whatsappToken}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+      body: JSON.stringify({ title, content }),
+    });
+
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      console.warn(
+        `[Notification] Failed to notify owner (${response.status} ${response.statusText})${
+          detail ? `: ${detail}` : ""
+        }`
+      );
+      return false;
+    }
+
     return true;
-  } catch (err) {
-    console.warn("[Notification] notifyOwner failed:", err);
+  } catch (error) {
+    console.warn("[Notification] Error calling notification service:", error);
     return false;
   }
-}
-
-async function getCompanyPhone(companyId: number): Promise<string | null> {
-  try {
-    const db = await import("../db.js");
-    const company = await db.getCompanyById(companyId);
-    return company?.phone ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export async function sendNotification(payload: NotificationPayload): Promise<void> {
-  throw new Error("Push notifications are disabled. Use notifyOwner for company notifications.");
 }

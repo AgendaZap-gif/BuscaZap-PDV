@@ -106,7 +106,9 @@ temp/
 *.sqlite
 *.sqlite3
 
-# Manus legacy files
-.manus/
-*.backup
-server/_core/oauth.ts.backup
+# Webdev artifacts (checkpoint zips, migrations, etc.)
+.webdev/
+
+# Manus version file (auto-generated, not part of source)
+client/public/__manus__/version.json
+node_modules
