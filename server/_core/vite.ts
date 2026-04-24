@@ -62,7 +62,14 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  app.use("*", (req, res) => {
+    const indexPath = path.resolve(distPath, "index.html");
+    console.log(`[serveStatic] Serving index.html for path: ${req.originalUrl}, indexPath: ${indexPath}`);
+    res.sendFile(indexPath, (err) => {
+      if (err) {
+        console.error(`[serveStatic] Error serving index.html:`, err);
+        res.status(500).send("Error loading application");
+      }
+    });
   });
 }

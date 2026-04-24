@@ -50,9 +50,10 @@ export function registerOAuthRoutes(app: Express) {
       });
 
       const cookieOptions = getSessionCookieOptions(req);
+      console.log(`[OAuth] Setting cookie ${COOKIE_NAME}, options:`, cookieOptions);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      console.log("[OAuth] Redirecting to /");
+      console.log("[OAuth] Redirecting to / with session cookie set");
       res.redirect(302, "/");
     } catch (error) {
       console.error("[OAuth] Callback failed", error);

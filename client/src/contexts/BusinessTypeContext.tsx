@@ -115,6 +115,8 @@ export function BusinessTypeProvider({ children }: { children: React.ReactNode }
     refetchOnWindowFocus: true,
   });
 
+  console.log(`[BusinessTypeProvider] Auth state:`, { isLoading: meQuery.isLoading, hasData: !!meQuery.data, error: meQuery.error?.message });
+
   if (meQuery.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -127,8 +129,11 @@ export function BusinessTypeProvider({ children }: { children: React.ReactNode }
   }
 
   if (!meQuery.data) {
+    console.log(`[BusinessTypeProvider] No user data, redirecting to login`);
     return <RedirectToLogin />;
   }
+
+  console.log(`[BusinessTypeProvider] User authenticated:`, meQuery.data.openId || meQuery.data.id);
 
   return <AuthenticatedBusinessTypeInner>{children}</AuthenticatedBusinessTypeInner>;
 }

@@ -24,25 +24,21 @@ function isSecureRequest(req: Request) {
 export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  // const hostname = req.hostname;
-  // const shouldSetDomain =
-  //   hostname &&
-  //   !LOCAL_HOSTS.has(hostname) &&
-  //   !isIpAddress(hostname) &&
-  //   hostname !== "127.0.0.1" &&
-  //   hostname !== "::1";
+  // Em produção (Railway), sempre usar secure=true para HTTPS
+  // sameSite: "none" é necessário para cross-domain (OAuth callback)
+  const isSecure = process.env.NODE_ENV === "production" || isSecureRequest(req);
 
-  // const domain =
-  //   shouldSetDomain && !hostname.startsWith(".")
-  //     ? `.${hostname}`
-  //     : shouldSetDomain
-  //       ? hostname
-  //       : undefined;
-
-  return {
+  const options = {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    sameSite: "none" as const,
+    secure: true, // Sempre true para sameSite: "none" funcionar
+  };
+
+  console.log(`[Cookie] Options:`, { ...options, secure: isSecure });
+
+  return {
+    ...options,
+    secure: isSecure,
   };
 }
