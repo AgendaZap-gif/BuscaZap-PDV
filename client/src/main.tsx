@@ -8,9 +8,15 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 
-// Debug cookies
+// Debug cookies e URL
 console.log(`[Client] Cookies: ${document.cookie || 'none'}`);
 console.log(`[Client] Location: ${window.location.href}`);
+console.log(`[Client] Path: ${window.location.pathname}`);
+
+// Detectar se estamos na página de callback OAuth
+if (window.location.pathname === '/api/oauth/callback') {
+  console.log(`[Client] OAuth callback detected - waiting for server redirect`);
+}
 
 const queryClient = new QueryClient();
 
