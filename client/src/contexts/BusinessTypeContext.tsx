@@ -139,6 +139,24 @@ export function BusinessTypeProvider({ children }: { children: React.ReactNode }
     );
   }
 
+  if (meQuery.error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
+        <div className="text-center max-w-md">
+          <h1 className="text-xl font-bold text-red-800 mb-2">Erro de Autenticação</h1>
+          <p className="text-red-600 mb-4">{meQuery.error.message}</p>
+          <p className="text-sm text-slate-500">Tente fazer login novamente.</p>
+          <a
+            href={getLoginUrl()}
+            className="inline-block mt-4 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+          >
+            Fazer Login
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   if (!meQuery.data) {
     return <LoginRequired />;
   }

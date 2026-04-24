@@ -42,6 +42,17 @@ async function startServer() {
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
 
+  // Rota de diagnóstico para verificar cookie
+  app.get("/api/auth-check", (req, res) => {
+    const cookies = req.headers.cookie;
+    console.log(`[AuthCheck] Cookies: ${cookies ? 'present' : 'missing'}`);
+    res.json({
+      cookies: cookies ? 'present' : 'missing',
+      cookieValue: cookies,
+      timestamp: new Date().toISOString()
+    });
+  });
+
   // Webhook receiver para pedidos Pedijá vindos do BuscaZap
   app.use("/api/pedija", pedijaWebhookRoutes);
   // tRPC API
