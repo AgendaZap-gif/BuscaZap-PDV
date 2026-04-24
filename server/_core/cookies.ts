@@ -28,21 +28,16 @@ export function getSessionCookieOptions(
   // sameSite: "none" é necessário para cross-domain (OAuth callback)
   const isSecure = process.env.NODE_ENV === "production" || isSecureRequest(req);
 
-  const hostname = req.hostname;
-  const domain = hostname && hostname.includes('.') ? `.${hostname}` : undefined;
-
+  // Não definir domain - deixa o navegador usar o domínio padrão da requisição
+  // domain explícito pode causar problemas em alguns navegadores
   const options = {
     httpOnly: true,
     path: "/",
     sameSite: "none" as const,
-    secure: true, // Sempre true para sameSite: "none" funcionar
-    domain, // Define domínio para cookie funcionar em subdomínios
+    secure: isSecure, // Deve ser true para sameSite: "none" funcionar
   };
 
-  console.log(`[Cookie] Options:`, { ...options, secure: isSecure, hostname });
+  console.log(`[Cookie] Options:`, { ...options, hostname: req.hostname, isSecure });
 
-  return {
-    ...options,
-    secure: isSecure,
-  };
+  return options;
 }

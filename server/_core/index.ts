@@ -9,6 +9,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { setupSocketIO } from "./socket";
 import pedijaWebhookRoutes from "../pedija-webhook";
+import { getSessionCookieOptions } from "./cookies";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -50,6 +51,17 @@ async function startServer() {
       cookies: cookies ? 'present' : 'missing',
       cookieValue: cookies,
       timestamp: new Date().toISOString()
+    });
+  });
+
+  // Rota de teste para setar cookie manualmente
+  app.get("/api/test-cookie", (req, res) => {
+    const cookieOptions = getSessionCookieOptions(req);
+    res.cookie("test_cookie", "test_value_" + Date.now(), { ...cookieOptions, maxAge: 86400000 });
+    console.log(`[TestCookie] Set cookie with options:`, cookieOptions);
+    res.json({
+      message: "Cookie set, check /api/auth-check",
+      options: cookieOptions
     });
   });
 

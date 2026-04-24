@@ -8,6 +8,10 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 
+// Debug cookies
+console.log(`[Client] Cookies: ${document.cookie || 'none'}`);
+console.log(`[Client] Location: ${window.location.href}`);
+
 const queryClient = new QueryClient();
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
