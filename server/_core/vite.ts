@@ -59,14 +59,31 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Serve arquivos estáticos - não passa para o próximo middleware se não encontrar
+  app.use(express.static(distPath, { 
+    dotfiles: 'ignore',
+    index: false // Não serve index.html automaticamente
+  }));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (req, res) => {
+  // SPA fallback: apenas para rotas que não são arquivos estáticos
+  app.use("*", (req, res, next) => {
+    // Se for uma requisição de arquivo (tem extensão), não serve index.html
+    const hasExtension = /\.[^\/]+$/.test(req.originalUrl);
+    if (hasExtension) {
+      return res.status(404).send("Not found");
+    }
+
     const indexPath = path.resolve(distPath, "index.html");
-    console.log(`[serveStatic] Serving index.html for path: ${req.originalUrl}, indexPath: ${indexPath}`);
+    
+    // Verifica se index.html existe
+    if (!fs.existsSync(indexPath)) {
+      console.error(`[serveStatic] index.html not found at: ${indexPath}`);
+      return res.status(500).send("Application not built");
+    }
+
+    console.log(`[serveStatic] Serving index.html for SPA route: ${req.originalUrl}`);
     res.sendFile(indexPath, (err) => {
-      if (err) {
+      if (err && !res.headersSent) {
         console.error(`[serveStatic] Error serving index.html:`, err);
         res.status(500).send("Error loading application");
       }
