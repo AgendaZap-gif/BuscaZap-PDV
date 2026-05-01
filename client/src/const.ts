@@ -19,10 +19,15 @@ export const getLoginUrl = () => {
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
   const state = btoa(redirectUri);
 
+  // Alinhado com o fluxo do sitbusca: appId deve ser 'buscazap' para o portal reconhecer
+  const finalAppId = appId.trim();
+  
   const url = new URL(`${oauthPortalUrl.replace(/\/$/, "")}/app-auth`);
-  url.searchParams.set("appId", appId.trim());
+  url.searchParams.set("appId", finalAppId);
   url.searchParams.set("redirectUri", redirectUri);
   url.searchParams.set("state", state);
+  
+  // O parâmetro 'type' é opcional mas ajuda no portal
   url.searchParams.set("type", "signIn");
 
   return url.toString();

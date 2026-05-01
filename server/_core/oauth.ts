@@ -25,9 +25,14 @@ export function registerOAuthRoutes(app: Express) {
 
     try {
       console.log("[OAuth] Exchanging code for token...");
+      console.log("[OAuth] Code:", code.substring(0, 5) + "...");
+      console.log("[OAuth] State (decoded):", atob(state));
+      
       const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-      console.log("[OAuth] Token received, getting user info...");
+      console.log("[OAuth] Token response received:", { hasToken: !!tokenResponse.accessToken });
+      
       const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
+      console.log("[OAuth] User info received:", { openId: userInfo.openId, name: userInfo.name });
 
       if (!userInfo.openId) {
         console.error("[OAuth] openId missing from user info");
