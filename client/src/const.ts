@@ -16,7 +16,13 @@ export const getLoginUrl = () => {
     );
     return `${window.location.origin}/`;
   }
-  const redirectUri = `${window.location.origin}/api/oauth/callback`;
+  // Captura o ID da empresa da sessão para passar no state
+  const buscazapCompanyId = window.sessionStorage.getItem("buscazap_company_id");
+  const redirectUriBase = `${window.location.origin}/api/oauth/callback`;
+  const redirectUri = buscazapCompanyId 
+    ? `${redirectUriBase}?buscazap_company_id=${buscazapCompanyId}`
+    : redirectUriBase;
+  
   const state = btoa(redirectUri);
 
   // Alinhado com o fluxo do sitbusca: appId deve ser 'buscazap' para o portal reconhecer

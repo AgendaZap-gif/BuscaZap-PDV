@@ -243,6 +243,13 @@ export async function getSellerIdByBuscazapCompanyId(buscazapCompanyId: number):
   return result.length > 0 ? result[0].id : null;
 }
 
+export async function getSellerByBuscazapCompanyId(buscazapCompanyId: number): Promise<Seller | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(sellers).where(eq(sellers.buscazapCompanyId as any, buscazapCompanyId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
 // ========== CUSTOMER QUERIES ==========
 
 export async function getCustomersBySellerIdWithStats(sellerId: number) {

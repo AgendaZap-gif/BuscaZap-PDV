@@ -23,7 +23,8 @@ export const appRouter = router({
   seller: router({
     // Get seller profile for current user
     profile: protectedProcedure.query(async ({ ctx }) => {
-      const seller = await getSellerByUserId(ctx.user.id);
+      // Usa o seller já resolvido no contexto
+      const seller = ctx.seller;
       if (!seller) {
         return null;
       }

@@ -66,87 +66,33 @@ export default function BusinessTypeSelection() {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-white mb-4">Bem-vindo ao {appName}</h1>
           <p className="text-xl text-slate-300">
-            Escolha o ramo do seu negócio (comércio, serviços ou restaurante). Isso define cardápio e Pedijà no
-            restaurante, agendamento nos serviços e estoque no comércio, alinhado à sua empresa no BuscaZap.
+            Sua conta BuscaZap foi autenticada, mas não encontramos uma empresa vinculada a este acesso no PDV.
+          </p>
+          <p className="mt-4 text-slate-400">
+            Certifique-se de acessar o PDV através do link oficial no seu painel administrativo do BuscaZap para que o vínculo seja feito automaticamente.
           </p>
         </div>
 
-        {/* Business Type Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          {(Object.keys(BUSINESS_TYPE_CONFIGS) as BusinessType[]).map((type) => {
-            const config = BUSINESS_TYPE_CONFIGS[type];
-            const IconComponent =
-              ICON_MAP[config.icon as keyof typeof ICON_MAP] || ShoppingCart;
-
-            return (
-              <Card
-                key={type}
-                className="group cursor-pointer hover:shadow-lg transition-all duration-300 overflow-hidden bg-white"
-              >
-                <div className="p-6 flex flex-col h-full">
-                  {/* Icon */}
-                  <div className="mb-4 inline-flex">
-                    <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-50 rounded-lg group-hover:from-blue-200 group-hover:to-blue-100 transition-colors">
-                      <IconComponent className="w-8 h-8 text-blue-600" />
-                    </div>
-                  </div>
-
-                  {/* Content */}
-                  <h2 className="text-2xl font-bold text-slate-900 mb-2">
-                    {config.label}
-                  </h2>
-                  <p className="text-slate-600 text-sm mb-6 flex-grow">
-                    {config.description}
-                  </p>
-
-                  {/* Features */}
-                  <ul className="space-y-2 mb-6 text-sm text-slate-700">
-                    {config.hasInventory && (
-                      <li className="flex items-center">
-                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2" />
-                        Gestão de estoque
-                      </li>
-                    )}
-                    {config.hasScheduling && (
-                      <li className="flex items-center">
-                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2" />
-                        Sistema de agendamento
-                      </li>
-                    )}
-                    {config.hasDelivery && (
-                      <li className="flex items-center">
-                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2" />
-                        Suporte a delivery
-                      </li>
-                    )}
-                    {config.hasDuration && (
-                      <li className="flex items-center">
-                        <span className="w-1.5 h-1.5 bg-blue-600 rounded-full mr-2" />
-                        Duração de serviços
-                      </li>
-                    )}
-                  </ul>
-
-                  {/* Button */}
-                  <Button
-                    onClick={() => handleSelectBusinessType(type)}
-                    disabled={isLoading && selectedType === type}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLoading && selectedType === type ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
-                        Carregando...
-                      </>
-                    ) : (
-                      `Escolher ${config.label}`
-                    )}
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+        {/* Info Box instead of Cards */}
+        <Card className="bg-white p-8 text-center shadow-xl">
+          <div className="flex justify-center mb-6">
+            <div className="p-4 bg-amber-100 rounded-full">
+              <Briefcase className="w-12 h-12 text-amber-600" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-4">Empresa não vinculada</h2>
+          <p className="text-slate-600 mb-8">
+            O sistema PDV é restrito a empresas já cadastradas no BuscaZap. 
+            Se você já possui uma empresa, acesse o painel administrativo e clique no link do PDV.
+          </p>
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.href = 'https://appbuscazap-c-bot.up.railway.app'}
+            className="w-full max-w-xs"
+          >
+            Ir para o Painel Principal
+          </Button>
+        </Card>
 
         {/* Info Footer */}
         <div className="text-center text-slate-400 text-sm">

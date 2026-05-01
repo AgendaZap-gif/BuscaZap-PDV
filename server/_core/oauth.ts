@@ -11,9 +11,6 @@ function getQueryParam(req: Request, key: string): string | undefined {
 
 export function registerOAuthRoutes(app: Express) {
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
-    console.log(`[OAuth] Callback received from: ${req.headers.referer || "unknown"}`);
-    console.log(`[OAuth] Query params:`, { code: req.query.code ? "present" : "missing", state: req.query.state ? "present" : "missing" });
-
     const code = getQueryParam(req, "code");
     const state = getQueryParam(req, "state");
 
@@ -25,22 +22,15 @@ export function registerOAuthRoutes(app: Express) {
 
     try {
       console.log("[OAuth] Exchanging code for token...");
-      console.log("[OAuth] Code:", code.substring(0, 5) + "...");
-      console.log("[OAuth] State (decoded):", atob(state));
-      
       const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-      console.log("[OAuth] Token response received:", { hasToken: !!tokenResponse.accessToken });
-      
+      console.log("[OAuth] Getting user info...");
       const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
-      console.log("[OAuth] User info received:", { openId: userInfo.openId, name: userInfo.name });
 
       if (!userInfo.openId) {
-        console.error("[OAuth] openId missing from user info");
-        res.status(400).json({ error: "openId missing from user info" });
-        return;
+        throw new Error("openId missing from user info");
       }
 
-      console.log(`[OAuth] User authenticated: ${userInfo.openId}`);
+      console.log(`[OAuth] Syncing user: ${userInfo.openId}`);
       await db.upsertUser({
         openId: userInfo.openId,
         name: userInfo.name || null,
@@ -49,16 +39,41 @@ export function registerOAuthRoutes(app: Express) {
         lastSignedIn: new Date(),
       });
 
+      const user = await db.getUserByOpenId(userInfo.openId);
+      if (!user) throw new Error("Failed to retrieve user after sync");
+
+      // Tentar vincular automaticamente se houver buscazap_company_id no estado ou cookie
+      // O estado é o redirectUri em base64, que pode conter query params
+      let buscazapCompanyId: number | null = null;
+      try {
+        const decodedState = atob(state);
+        const url = new URL(decodedState);
+        const id = url.searchParams.get("buscazap_company_id");
+        if (id) buscazapCompanyId = parseInt(id, 10);
+      } catch (e) {
+        console.warn("[OAuth] Failed to parse buscazap_company_id from state");
+      }
+
+      if (buscazapCompanyId) {
+        console.log(`[OAuth] Attempting auto-link to company: ${buscazapCompanyId}`);
+        const existingSeller = await db.getSellerByBuscazapCompanyId(buscazapCompanyId);
+        if (existingSeller && existingSeller.userId !== user.id) {
+          // Se a empresa já existe mas está vinculada a outro ID (ou o ID mudou no OAuth), 
+          // atualizamos o vínculo para o usuário atual
+          console.log(`[OAuth] Re-linking company ${buscazapCompanyId} to user ${user.id}`);
+          await db.updateSeller(existingSeller.id, { userId: user.id });
+        }
+      }
+
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
         name: userInfo.name || "",
         expiresInMs: ONE_YEAR_MS,
       });
 
       const cookieOptions = getSessionCookieOptions(req);
-      console.log(`[OAuth] Setting cookie ${COOKIE_NAME}, options:`, cookieOptions);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      console.log("[OAuth] Redirecting to / with session cookie set");
+      console.log("[OAuth] Success, redirecting to /");
       res.redirect(302, "/");
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
