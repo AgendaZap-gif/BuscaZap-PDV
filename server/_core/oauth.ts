@@ -11,17 +11,20 @@ function getQueryParam(req: Request, key: string): string | undefined {
 
 export function registerOAuthRoutes(app: Express) {
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
+    console.log(`[PDV-OAuth] ========== CALLBACK START ==========`);
+    console.log(`[PDV-OAuth] Query params:`, JSON.stringify(req.query));
+    
     const code = getQueryParam(req, "code");
     const state = getQueryParam(req, "state");
 
     if (!code || !state) {
-      console.error("[OAuth] Missing code or state");
+      console.error("[PDV-OAuth] Missing code or state");
       res.status(400).json({ error: "code and state are required" });
       return;
     }
 
     try {
-      console.log("[OAuth] Exchanging code for token...");
+      console.log("[PDV-OAuth] Exchanging code for token...");
       const tokenResponse = await sdk.exchangeCodeForToken(code, state);
       console.log("[OAuth] Getting user info...");
       const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
@@ -71,12 +74,14 @@ export function registerOAuthRoutes(app: Express) {
       });
 
       const cookieOptions = getSessionCookieOptions(req);
+      console.log(`[PDV-OAuth] Setting session cookie with options:`, JSON.stringify(cookieOptions));
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      console.log("[OAuth] Success, redirecting to /");
+      console.log("[PDV-OAuth] Success, redirecting to /");
+      console.log(`[PDV-OAuth] ========== CALLBACK END ==========`);
       res.redirect(302, "/");
     } catch (error) {
-      console.error("[OAuth] Callback failed", error);
+      console.error("[PDV-OAuth] Callback failed:", error);
       res.status(500).json({ error: "OAuth callback failed" });
     }
   });
