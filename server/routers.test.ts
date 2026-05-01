@@ -19,6 +19,14 @@ function createAuthContext(userId: number = 1, sellerId: number = 1): TrpcContex
 
   const ctx: TrpcContext = {
     user,
+    seller: {
+      id: sellerId,
+      userId: userId,
+      storeName: "Test Store",
+      businessType: "commerce",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any,
     req: {
       protocol: "https",
       headers: {},
