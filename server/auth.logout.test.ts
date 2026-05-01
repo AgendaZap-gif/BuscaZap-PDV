@@ -29,6 +29,7 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
     user,
     req: {
       protocol: "https",
+      hostname: "pdv.buscazapbrasil.com.br",
       headers: {},
     } as TrpcContext["req"],
     res: {
@@ -57,6 +58,20 @@ describe("auth.logout", () => {
       sameSite: "none",
       httpOnly: true,
       path: "/",
+    });
+  });
+
+  it("uses lax sameSite for non-https requests", async () => {
+    const { ctx, clearedCookies } = createAuthContext();
+    // Simulate HTTP
+    (ctx.req as any).protocol = "http";
+    const caller = appRouter.createCaller(ctx);
+
+    await caller.auth.logout();
+
+    expect(clearedCookies[0]?.options).toMatchObject({
+      secure: false,
+      sameSite: "lax",
     });
   });
 });

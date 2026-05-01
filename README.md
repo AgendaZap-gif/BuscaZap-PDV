@@ -8,6 +8,7 @@ Copie `.env.example` para `.env` e ajuste:
 
 - `VITE_OAUTH_PORTAL_URL`: URL base do portal OAuth usado no login.
 - `VITE_APP_ID`: identificador do app no portal OAuth.
+- `OAUTH_SERVER_URL`: URL do servidor de autenticação (backend do sitbusca) para validar tokens.
 - `DATABASE_URL`: conexão MySQL usada pelo servidor.
 - `BUSCAZAP_APP_API_URL`: URL base da API principal do BuscaZap para integrações (empresa, permissões, Pedijà/agendamentos).
 
