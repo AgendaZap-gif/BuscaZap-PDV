@@ -124,7 +124,11 @@ export function registerOAuthRoutes(app: Express) {
       res.redirect(302, "/");
     } catch (error) {
       console.error("[PDV-OAuth] Callback failed:", error);
-      res.status(500).json({ error: "OAuth callback failed" });
+      res.status(500).json({ 
+        error: "OAuth callback failed", 
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
     }
   });
 }

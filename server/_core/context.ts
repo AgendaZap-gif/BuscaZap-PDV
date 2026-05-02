@@ -28,6 +28,7 @@ export async function createContext(
         
         if (seller) {
           console.log("[Auth] Found seller by email, linking to user ID:", user.id);
+          // Importante: atualizar o vínculo para que o próximo login seja por ID
           await db.updateSeller(seller.id, { userId: user.id });
         }
       }
