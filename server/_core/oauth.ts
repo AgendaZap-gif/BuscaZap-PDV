@@ -26,26 +26,38 @@ export function registerOAuthRoutes(app: Express) {
     try {
       let userInfo: { openId: string; name?: string; email?: string; loginMethod?: string; platform?: string } | null = null;
 
-      // Se o código for um JSON em base64 (formato do nosso portal simplificado), extraímos direto
+      console.log("[PDV-OAuth] Processing code:", code.substring(0, 20) + "...");
+
+      // Tenta decodificar o código como JSON Base64 (nosso portal simplificado)
       try {
         const decodedCode = JSON.parse(atob(code));
+        console.log("[PDV-OAuth] Decoded simple code:", JSON.stringify(decodedCode));
         if (decodedCode.userId) {
-          console.log("[PDV-OAuth] Simple auth code detected, skipping exchange");
-          userInfo = { openId: decodedCode.userId };
+          userInfo = { 
+            openId: decodedCode.userId,
+            name: decodedCode.name || decodedCode.userId.split(':')[1] || "Usuário"
+          };
+          console.log("[PDV-OAuth] Using simple auth info:", JSON.stringify(userInfo));
         }
       } catch (e) {
-        console.log("[PDV-OAuth] Not a simple code, proceeding with standard exchange...");
+        console.log("[PDV-OAuth] Code is not JSON Base64, error:", e.message);
       }
 
+      // Se não conseguimos extrair os dados do código, SÓ ENTÃO tentamos a troca oficial
       if (!userInfo) {
-        console.log("[PDV-OAuth] Exchanging code for token...");
-        const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-        console.log("[OAuth] Getting user info...");
-        userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
+        console.log("[PDV-OAuth] Proceeding with standard exchange (Legacy/Official)...");
+        try {
+          const tokenResponse = await sdk.exchangeCodeForToken(code, state);
+          userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
+        } catch (sdkError) {
+          console.error("[PDV-OAuth] SDK Exchange failed:", sdkError.message);
+          throw new Error("Falha na troca de token: " + sdkError.message);
+        }
       }
 
       if (!userInfo || !userInfo.openId) {
-        throw new Error("openId missing from user info");
+        console.error("[PDV-OAuth] Final userInfo is invalid:", userInfo);
+        throw new Error("Não foi possível obter a identificação do usuário");
       }
 
       console.log(`[OAuth] Syncing user: ${userInfo.openId}`);
