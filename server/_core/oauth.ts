@@ -24,12 +24,27 @@ export function registerOAuthRoutes(app: Express) {
     }
 
     try {
-      console.log("[PDV-OAuth] Exchanging code for token...");
-      const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-      console.log("[OAuth] Getting user info...");
-      const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
+      let userInfo: { openId: string; name?: string; email?: string; loginMethod?: string; platform?: string } | null = null;
 
-      if (!userInfo.openId) {
+      // Se o código for um JSON em base64 (formato do nosso portal simplificado), extraímos direto
+      try {
+        const decodedCode = JSON.parse(atob(code));
+        if (decodedCode.userId) {
+          console.log("[PDV-OAuth] Simple auth code detected, skipping exchange");
+          userInfo = { openId: decodedCode.userId };
+        }
+      } catch (e) {
+        console.log("[PDV-OAuth] Not a simple code, proceeding with standard exchange...");
+      }
+
+      if (!userInfo) {
+        console.log("[PDV-OAuth] Exchanging code for token...");
+        const tokenResponse = await sdk.exchangeCodeForToken(code, state);
+        console.log("[OAuth] Getting user info...");
+        userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
+      }
+
+      if (!userInfo || !userInfo.openId) {
         throw new Error("openId missing from user info");
       }
 
