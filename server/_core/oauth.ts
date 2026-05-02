@@ -28,19 +28,34 @@ export function registerOAuthRoutes(app: Express) {
 
       console.log("[PDV-OAuth] Processing code:", code.substring(0, 20) + "...");
 
-      // Tenta decodificar o código como JSON Base64 (nosso portal simplificado)
+      // Tenta decodificar o código (pode ser JSON Base64 ou apenas String Base64)
       try {
-        const decodedCode = JSON.parse(atob(code));
-        console.log("[PDV-OAuth] Decoded simple code:", JSON.stringify(decodedCode));
-        if (decodedCode.userId) {
-          userInfo = { 
-            openId: decodedCode.userId,
-            name: decodedCode.name || decodedCode.userId.split(':')[1] || "Usuário"
-          };
-          console.log("[PDV-OAuth] Using simple auth info:", JSON.stringify(userInfo));
+        const decodedString = atob(code);
+        console.log("[PDV-OAuth] Decoded raw string:", decodedString);
+        
+        try {
+          const decodedJson = JSON.parse(decodedString);
+          if (decodedJson.userId) {
+            userInfo = { 
+              openId: decodedJson.userId,
+              name: decodedJson.name || decodedJson.userId.split(':')[1] || "Usuário"
+            };
+          }
+        } catch (jsonErr) {
+          // Se não for JSON, mas contiver um formato de identificador (ex: email:xxx)
+          if (decodedString.includes(':') || decodedString.includes('@')) {
+            userInfo = { 
+              openId: decodedString,
+              name: decodedString.split(':')[1] || decodedString.split('@')[0] || "Usuário"
+            };
+          }
+        }
+        
+        if (userInfo) {
+          console.log("[PDV-OAuth] Successfully extracted user info:", JSON.stringify(userInfo));
         }
       } catch (e) {
-        console.log("[PDV-OAuth] Code is not JSON Base64, error:", e.message);
+        console.log("[PDV-OAuth] Code decoding failed:", e.message);
       }
 
       // Se não conseguimos extrair os dados do código, SÓ ENTÃO tentamos a troca oficial
