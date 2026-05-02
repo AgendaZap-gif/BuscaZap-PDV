@@ -87,8 +87,7 @@ export function registerOAuthRoutes(app: Express) {
       const user = await db.getUserByOpenId(userInfo.openId);
       if (!user) throw new Error("Failed to retrieve user after sync");
 
-      // Tentar vincular automaticamente se houver buscazap_company_id no estado ou cookie
-      // O estado é o redirectUri em base64, que pode conter query params
+      // Tentar vincular automaticamente se houver buscazap_company_id no estado
       let buscazapCompanyId: number | null = null;
       try {
         const decodedState = atob(state);
@@ -99,12 +98,19 @@ export function registerOAuthRoutes(app: Express) {
         console.warn("[OAuth] Failed to parse buscazap_company_id from state");
       }
 
-      if (buscazapCompanyId) {
+      // NOVO: Se não veio ID da empresa no link, mas temos o e-mail do usuário, 
+      // tentamos buscar uma empresa que tenha esse e-mail no cadastro (padrão sitbusca)
+      if (!buscazapCompanyId && user.email) {
+        console.log(`[OAuth] No companyId in state, searching by email: ${user.email}`);
+        const sellerByEmail = await db.getSellerByEmail(user.email);
+        if (sellerByEmail) {
+          console.log(`[OAuth] Found seller by email, linking user ${user.id} to seller ${sellerByEmail.id}`);
+          await db.updateSeller(sellerByEmail.id, { userId: user.id });
+        }
+      } else if (buscazapCompanyId) {
         console.log(`[OAuth] Attempting auto-link to company: ${buscazapCompanyId}`);
         const existingSeller = await db.getSellerByBuscazapCompanyId(buscazapCompanyId);
         if (existingSeller && existingSeller.userId !== user.id) {
-          // Se a empresa já existe mas está vinculada a outro ID (ou o ID mudou no OAuth), 
-          // atualizamos o vínculo para o usuário atual
           console.log(`[OAuth] Re-linking company ${buscazapCompanyId} to user ${user.id}`);
           await db.updateSeller(existingSeller.id, { userId: user.id });
         }

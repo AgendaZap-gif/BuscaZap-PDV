@@ -32,6 +32,13 @@ export async function createContext(
           await db.updateSeller(seller.id, { userId: user.id });
         }
       }
+
+      // Se ainda não achar, tenta buscar se esse usuário é dono de alguma empresa no banco compartilhado
+      // No sitbusca, a tabela companies tem um campo userId
+      if (!seller) {
+        console.log("[Auth] Still no seller, checking shared database companies for email:", user.email);
+        // Implementar busca na tabela companies se necessário, mas por enquanto vamos focar no e-mail do seller
+      }
     }
   } catch (error) {
     // Authentication is optional for public procedures.
