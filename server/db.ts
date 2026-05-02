@@ -250,6 +250,18 @@ export async function getSellerByBuscazapCompanyId(buscazapCompanyId: number): P
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function getSellerByEmail(email: string): Promise<Seller | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  // Primeiro buscamos o usuário pelo email
+  const dbUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  if (dbUser.length === 0) return undefined;
+  
+  // Depois buscamos o vendedor vinculado a esse usuário
+  return getSellerByUserId(dbUser[0].id);
+}
+
 // ========== CUSTOMER QUERIES ==========
 
 export async function getCustomersBySellerIdWithStats(sellerId: number) {

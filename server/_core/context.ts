@@ -20,6 +20,17 @@ export async function createContext(
     user = await sdk.authenticateRequest(opts.req);
     if (user) {
       seller = await db.getSellerByUserId(user.id);
+
+      // Se não achar por ID, tenta pelo e-mail (padrão sitbusca)
+      if (!seller && user.email) {
+        console.log("[Auth] Seller not found by ID, trying email:", user.email);
+        seller = await db.getSellerByEmail(user.email);
+        
+        if (seller) {
+          console.log("[Auth] Found seller by email, linking to user ID:", user.id);
+          await db.updateSeller(seller.id, { userId: user.id });
+        }
+      }
     }
   } catch (error) {
     // Authentication is optional for public procedures.
