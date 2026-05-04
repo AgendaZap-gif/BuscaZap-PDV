@@ -22,10 +22,20 @@ export default function Products() {
     setLocation(`/products/${productId}/edit`);
   };
 
+  const utils = trpc.useUtils();
+  const deleteMutation = trpc.products.delete.useMutation({
+    onSuccess: () => {
+      toast.success(`${config.productLabel} deletado com sucesso!`);
+      utils.seller.getProducts.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`Erro ao deletar ${config.productLabel.toLowerCase()}: ${error.message}`);
+    }
+  });
+
   const handleDeleteProduct = (productId: number) => {
     if (confirm(`Tem certeza que deseja deletar este ${config.productLabel.toLowerCase()}?`)) {
-      toast.success(`${config.productLabel} deletado com sucesso!`);
-      // TODO: Implement delete mutation
+      deleteMutation.mutate({ productId });
     }
   };
 

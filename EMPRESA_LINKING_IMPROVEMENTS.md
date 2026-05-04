@@ -121,16 +121,29 @@ As mudanças seguem o mesmo padrão do sitbusca:
 1. **Busca por ID primeiro**: Vínculo direto e rápido
 2. **Fallback por email**: Compatibilidade com usuários que ainda não têm vínculo por ID
 3. **Atualização automática**: Quando encontra por email, atualiza o vínculo para ID
-4. **Logs estruturados**: Facilita debug e troubleshooting
+4. **Logs estruturados**: Facilita debug e troubleshootin## Integração do Cardápio Digital (PediJá)
 
-## Próximos Passos (Opcional)
+Agora o PDV Restaurante é o centro de gerenciamento do cardápio digital:
 
-1. **Integração com banco compartilhado**: Implementar busca na tabela `companies` do sitbusca se necessário
-2. **Sincronização bidirecional**: Garantir que mudanças no sitbusca se reflitam no PDV
-3. **Testes automatizados**: Adicionar testes para os fluxos de vinculação
-4. **Documentação de API**: Documentar os endpoints de vinculação
+1. **Sincronização Automática**:
+   - **Criação**: Ao adicionar um prato no PDV, ele é criado automaticamente no PediJá.
+   - **Edição**: Alterações de nome, preço, descrição e imagem no PDV refletem instantaneamente no cardápio online.
+   - **Exclusão**: Ao deletar no PDV, o item é removido do cardápio digital para evitar pedidos de itens inexistentes.
 
-## Arquivos Modificados
+2. **Interface Unificada**:
+   - O formulário de produtos no PDV agora inclui campo para **URL da Imagem**, que é enviada para o site principal.
+   - Suporte completo para **Tempo de Preparo** e **Categorias** sincronizadas.
+
+3. **Arquitetura de Comunicação**:
+   - O PDV utiliza o `PedijaService` para se comunicar com a API REST do BuscaZap (`/api/pdv/menu`).
+   - Autenticação segura via `x-pdv-secret`.
+
+## Arquivos Modificados (Integração Cardápio)
+
+- `client/src/pages/ProductNew.tsx`: Implementação de carregamento de dados e mutations de criação/edição.
+- `client/src/components/ProductForm.tsx`: Adição de suporte a `initialData`, campos de imagem e lógica de restaurante.
+- `client/src/pages/Products.tsx`: Ativação da funcionalidade de exclusão sincronizada.
+- `server/routers.ts`: Refinamento das procedures de produtos para garantir o fluxo de sync.ivos Modificados
 
 - `server/_core/context.ts`: Implementação do Step 3 (busca em banco compartilhado) e criação automática de seller
 - `server/_core/oauth.ts`: Melhorias no callback OAuth, auto-linking e normalização de email

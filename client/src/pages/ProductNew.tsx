@@ -13,18 +13,51 @@ export default function ProductNew() {
   const [isProductRoute, params] = useRoute('/products/:id/edit');
 
   const categoriesQuery = trpc.seller.getDefaultCategories.useQuery();
-  // TODO: Create product mutation when implemented in routers
+  const utils = trpc.useUtils();
+  
+  const createMutation = trpc.products.create.useMutation({
+    onSuccess: () => {
+      toast.success(`${config.productLabel} criado com sucesso!`);
+      utils.seller.getProducts.invalidate();
+      setLocation('/products');
+    },
+    onError: (error) => {
+      toast.error(`Erro ao criar ${config.productLabel.toLowerCase()}: ${error.message}`);
+    }
+  });
+
+  const updateMutation = trpc.products.update.useMutation({
+    onSuccess: () => {
+      toast.success(`${config.productLabel} atualizado com sucesso!`);
+      utils.seller.getProducts.invalidate();
+      setLocation('/products');
+    },
+    onError: (error) => {
+      toast.error(`Erro ao atualizar ${config.productLabel.toLowerCase()}: ${error.message}`);
+    }
+  });
 
   const categories = categoriesQuery.data || [];
   const isEditMode = isProductRoute && params?.id;
+  const productId = isEditMode ? parseInt(params.id) : null;
+
+  // No modo edição, buscar os produtos do vendedor e encontrar o correto
+  const productsQuery = trpc.seller.getProducts.useQuery(undefined, {
+    enabled: !!isEditMode
+  });
+  
+  const initialData = isEditMode && productsQuery.data 
+    ? productsQuery.data.find(p => p.id === productId)
+    : null;
 
   const handleSubmit = async (data: any) => {
-    try {
-      // TODO: Implement create/update product mutation
-      toast.success(`${config.productLabel} salvo com sucesso!`);
-      setLocation('/products');
-    } catch (error) {
-      toast.error(`Erro ao salvar ${config.productLabel.toLowerCase()}`);
+    if (isEditMode && productId) {
+      updateMutation.mutate({
+        productId,
+        ...data
+      });
+    } else {
+      createMutation.mutate(data);
     }
   };
 
@@ -61,7 +94,8 @@ export default function ProductNew() {
           <ProductForm
             categories={categories}
             onSubmit={handleSubmit}
-            isLoading={false}
+            isLoading={createMutation.isPending || updateMutation.isPending}
+            initialData={initialData}
           />
         </Card>
       </div>

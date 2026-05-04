@@ -16,30 +16,51 @@ interface ProductFormProps {
   categories: string[];
   onSubmit: (data: any) => void;
   isLoading?: boolean;
+  initialData?: any;
 }
 
 export default function ProductForm({
   categories,
   onSubmit,
   isLoading = false,
+  initialData,
 }: ProductFormProps) {
   const config = useBusinessTypeConfig();
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    sku: '',
-    price: '',
-    cost: '',
-    category: '',
-    // Commerce-specific
-    weight: '',
-    length: '',
-    width: '',
-    height: '',
-    // Services-specific
-    duration: '',
-    // Restaurant-specific
-    preparationTime: '',
+  const [formData, setFormData] = useState(() => {
+    if (initialData) {
+      return {
+        name: initialData.name || '',
+        description: initialData.description || '',
+        sku: initialData.sku || '',
+        price: initialData.price || '',
+        cost: initialData.cost || '',
+        category: initialData.category || '',
+        imageUrl: initialData.images ? JSON.parse(initialData.images)[0] : '',
+        weight: initialData.weight || '',
+        length: initialData.length || '',
+        width: initialData.width || '',
+        height: initialData.height || '',
+        duration: initialData.duration?.toString() || '',
+        preparationTime: initialData.preparationTime?.toString() || '',
+        isActive: initialData.isActive !== 0,
+      };
+    }
+    return {
+      name: '',
+      description: '',
+      sku: '',
+      price: '',
+      cost: '',
+      category: '',
+      imageUrl: '',
+      weight: '',
+      length: '',
+      width: '',
+      height: '',
+      duration: '',
+      preparationTime: '',
+      isActive: true,
+    };
   });
 
   const handleChange = (field: string, value: string) => {
@@ -53,17 +74,22 @@ export default function ProductForm({
     const filteredData = Object.entries(formData).reduce((acc, [key, value]) => {
       if (!value) return acc;
       
+      // Common fields
+      if (['name', 'description', 'sku', 'price', 'cost', 'category', 'imageUrl'].includes(key)) {
+        acc[key] = value;
+      }
+      
       // Only include fields relevant to this business type
       if (config.type === 'commerce') {
-        if (['name', 'description', 'sku', 'price', 'cost', 'category', 'weight', 'length', 'width', 'height'].includes(key)) {
+        if (['weight', 'length', 'width', 'height'].includes(key)) {
           acc[key] = value;
         }
       } else if (config.type === 'services') {
-        if (['name', 'description', 'sku', 'price', 'cost', 'category', 'duration'].includes(key)) {
+        if (['duration'].includes(key)) {
           acc[key] = value;
         }
       } else if (config.type === 'restaurant') {
-        if (['name', 'description', 'sku', 'price', 'cost', 'category', 'preparationTime', 'weight'].includes(key)) {
+        if (['preparationTime', 'weight'].includes(key)) {
           acc[key] = value;
         }
       }
@@ -149,6 +175,19 @@ export default function ProductForm({
               required
             />
           </div>
+        </div>
+
+        <div>
+          <Label htmlFor="imageUrl">URL da Imagem</Label>
+          <Input
+            id="imageUrl"
+            value={formData.imageUrl}
+            onChange={(e) => handleChange('imageUrl', e.target.value)}
+            placeholder="https://exemplo.com/imagem.jpg"
+          />
+          <p className="text-xs text-slate-500 mt-1">
+            Esta imagem será exibida no cardápio digital PediJá.
+          </p>
         </div>
       </div>
 
@@ -309,7 +348,7 @@ export default function ProductForm({
           disabled={isLoading}
           className="flex-1 bg-blue-600 hover:bg-blue-700"
         >
-          {isLoading ? 'Salvando...' : `Adicionar ${config.productLabel}`}
+          {isLoading ? 'Salvando...' : `${initialData ? 'Atualizar' : 'Adicionar'} ${config.productLabel}`}
         </Button>
       </div>
     </form>
