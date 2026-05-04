@@ -33,8 +33,9 @@ export async function createContext(
 
       // 2) Se não achar por userId, tentar por email (fallback - padrão sitbusca)
       if (!seller && user.email) {
-        console.log("[Auth] Step 2: Searching seller by email:", user.email);
-        seller = await db.getSellerByEmail(user.email);
+        const normalizedEmail = user.email.toLowerCase().trim();
+        console.log("[Auth] Step 2: Searching seller by normalized email:", normalizedEmail);
+        seller = await db.getSellerByEmail(normalizedEmail);
         
         if (seller) {
           console.log("[Auth] ✓ Found seller by email:", seller.id, "storeName:", seller.storeName);

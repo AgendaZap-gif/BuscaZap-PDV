@@ -40,8 +40,14 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     type TextField = (typeof textFields)[number];
 
     const assignNullable = (field: TextField) => {
-      const value = user[field];
+      let value = user[field];
       if (value === undefined) return;
+      
+      // Normalizar email para lowercase e sem espaços
+      if (field === "email" && typeof value === "string") {
+        value = value.toLowerCase().trim();
+      }
+      
       const normalized = value ?? null;
       values[field] = normalized;
       updateSet[field] = normalized;
@@ -251,12 +257,20 @@ export async function getSellerByEmail(email: string): Promise<Seller | undefine
   const db = await getDb();
   if (!db) return undefined;
   
-  // Primeiro buscamos o usuário pelo email
-  const dbUser = await db.select().from(users).where(eq(users.email, email)).limit(1);
-  if (dbUser.length === 0) return undefined;
+  // Tentar buscar diretamente na tabela sellers pelo email (se houver essa coluna)
+  // Nota: Verificamos o esquema e a tabela sellers NÃO tem coluna email.
+  // Mas no sitbusca, a tabela 'companies' tem email. No PDV, o seller é vinculado ao user.
+  // O problema é que o user no PDV pode ser novo, mas o seller já existir com o email antigo.
   
-  // Depois buscamos o vendedor vinculado a esse usuário
-  return getSellerByUserId(dbUser[0].id);
+  // Vamos buscar na tabela users por email para encontrar o ID do usuário que era dono desse seller
+  const dbUsers = await db.select().from(users).where(eq(users.email, email));
+  
+  for (const dbUser of dbUsers) {
+    const seller = await getSellerByUserId(dbUser.id);
+    if (seller) return seller;
+  }
+  
+  return undefined;
 }
 
 // ========== CUSTOMER QUERIES ==========

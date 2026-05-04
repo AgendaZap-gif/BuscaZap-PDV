@@ -127,14 +127,15 @@ export function registerOAuthRoutes(app: Express) {
       // Estratégia 2: Se não veio ID da empresa no link, mas temos o e-mail do usuário, 
       // tentamos buscar um seller que tenha esse e-mail no cadastro (padrão sitbusca)
       if (!buscazapCompanyId && user.email) {
-        console.log(`[OAuth] Step 2: Searching seller by email: ${user.email}`);
+        const normalizedEmail = user.email.toLowerCase().trim();
+        console.log(`[OAuth] Step 2: Searching seller by normalized email: ${normalizedEmail}`);
         try {
-          const sellerByEmail = await db.getSellerByEmail(user.email);
+          const sellerByEmail = await db.getSellerByEmail(normalizedEmail);
           if (sellerByEmail) {
             console.log(`[OAuth] ✓ Found seller by email, linking user ${user.id} to seller ${sellerByEmail.id}`);
             await db.updateSeller(sellerByEmail.id, { userId: user.id });
           } else {
-            console.log(`[OAuth] ✗ No seller found with email: ${user.email}`);
+            console.log(`[OAuth] ✗ No seller found with email: ${normalizedEmail}`);
           }
         } catch (err) {
           console.error(`[OAuth] ✗ Error searching seller by email:`, err);

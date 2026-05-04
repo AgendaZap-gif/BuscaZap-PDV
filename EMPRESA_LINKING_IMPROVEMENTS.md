@@ -32,11 +32,12 @@ No sitbusca, a vinculação de empresa ocorre em duas etapas:
 **Depois:**
 - Adicionado fluxo de 3 passos com logs detalhados:
   1. **Step 1**: Buscar seller por `userId` (vínculo direto)
-  2. **Step 2**: Se não encontrar, buscar por email (fallback - padrão sitbusca)
+  2. **Step 2**: Se não encontrar, buscar por **email normalizado** (fallback - padrão sitbusca)
   3. **Step 3**: Se ainda não encontrar, preparado para busca em banco compartilhado (futuro)
 - Adicionado tratamento de erro robusto ao atualizar vínculo
 - Logs estruturados com símbolos visuais (✓, ✗, ℹ️) para melhor legibilidade
 - Informações completas do seller (ID e storeName) nos logs
+- **Correção**: Agora o email é normalizado (lowercase e trim) antes da busca para garantir que variações de digitação não quebrem o vínculo.
 
 **Benefícios:**
 - Melhor rastreabilidade de problemas de vinculação
@@ -131,5 +132,6 @@ As mudanças seguem o mesmo padrão do sitbusca:
 
 ## Arquivos Modificados
 
-- `server/_core/context.ts`: Melhorias na resolução de seller
-- `server/_core/oauth.ts`: Melhorias no callback OAuth e auto-linking
+- `server/_core/context.ts`: Melhorias na resolução de seller e normalização de email
+- `server/_core/oauth.ts`: Melhorias no callback OAuth, auto-linking e normalização de email
+- `server/db.ts`: Correção na função `getSellerByEmail` para ser mais resiliente e normalização no `upsertUser`
