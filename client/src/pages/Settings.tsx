@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Settings as SettingsIcon, Save, MapPin, Clock, CreditCard, Phone, Mail, ShoppingCart, Toggle2, Loader2 } from "lucide-react";
+import { Settings as SettingsIcon, Save, MapPin, Clock, CreditCard, Phone, Mail, ShoppingCart, ToggleRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useBusinessType } from "@/contexts/BusinessTypeContext";
 import { trpc } from "@/lib/trpc";
@@ -179,7 +179,7 @@ export default function Settings() {
         {businessType === "restaurant" && (
           <Card className="p-6 mb-6 bg-green-50 border-green-200">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Toggle2 className="w-5 h-5" />
+              <ToggleRight className="w-5 h-5" />
               Configurações do PediJá
             </h2>
             <div className="space-y-4">
