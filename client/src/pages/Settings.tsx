@@ -1,11 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Settings as SettingsIcon, Save, MapPin, Clock, CreditCard, Phone, Mail } from "lucide-react";
+import { Settings as SettingsIcon, Save, MapPin, Clock, CreditCard, Phone, Mail, ShoppingCart, Toggle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useBusinessType } from "@/contexts/BusinessTypeContext";
+import { trpc } from "@/lib/trpc";
 
 export default function Settings() {
+  const { businessType, setBusinessType } = useBusinessType();
+  const [pedijaSettings, setPedijaSettings] = useState<any>(null);
+  const [isOnline, setIsOnline] = useState(false);
+  const [isLoadingPedija, setIsLoadingPedija] = useState(false);
+  const [isSavingBusinessType, setIsSavingBusinessType] = useState(false);
   const [formData, setFormData] = useState({
     storeName: "Minha Loja - Serviços",
     storeDescription: "Prestação de serviços com agendamento",
@@ -36,6 +43,22 @@ export default function Settings() {
   });
 
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Queries e mutations para PediJá
+  const pedijaSettingsQuery = trpc.pedijaSettings?.getSettings?.useQuery(undefined, {
+    enabled: businessType === "restaurant",
+  });
+  const updateBusinessTypeMutation = trpc.seller?.updateBusinessType?.useMutation();
+  const toggleOnlineStatusMutation = trpc.pedijaSettings?.toggleOnlineStatus?.useMutation();
+  const activateOnPedijaMutation = trpc.pedijaSettings?.activateOnPedija?.useMutation();
+  
+  // Carregar configurações do PediJá
+  useEffect(() => {
+    if (pedijaSettingsQuery?.data) {
+      setPedijaSettings(pedijaSettingsQuery.data);
+      setIsOnline(pedijaSettingsQuery.data?.isOnlineForOrders === 1);
+    }
+  }, [pedijaSettingsQuery?.data]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -49,6 +72,59 @@ export default function Settings() {
       setIsSaving(false);
       toast.success("Configurações salvas com sucesso!");
     }, 1000);
+  };
+  
+  const handleChangeBusinessType = async (newType: string) => {
+    try {
+      setIsSavingBusinessType(true);
+      if (updateBusinessTypeMutation) {
+        await updateBusinessTypeMutation.mutateAsync({
+          businessType: newType as any,
+        });
+        setBusinessType(newType as any);
+        toast.success(`Tipo de negócio alterado para ${newType}!`);
+      }
+    } catch (error) {
+      toast.error("Erro ao alterar tipo de negócio");
+      console.error(error);
+    } finally {
+      setIsSavingBusinessType(false);
+    }
+  };
+  
+  const handleActivatePedija = async () => {
+    try {
+      setIsLoadingPedija(true);
+      if (activateOnPedijaMutation) {
+        await activateOnPedijaMutation.mutateAsync({});
+        await pedijaSettingsQuery?.refetch?.();
+        toast.success("Empresa ativada no PediJá com sucesso!");
+      }
+    } catch (error) {
+      toast.error("Erro ao ativar no PediJá");
+      console.error(error);
+    } finally {
+      setIsLoadingPedija(false);
+    }
+  };
+  
+  const handleToggleOnlineStatus = async (online: boolean) => {
+    try {
+      setIsLoadingPedija(true);
+      if (toggleOnlineStatusMutation) {
+        await toggleOnlineStatusMutation.mutateAsync({
+          isActive: online,
+        });
+        setIsOnline(online);
+        await pedijaSettingsQuery?.refetch?.();
+        toast.success(online ? "Empresa online para pedidos!" : "Empresa offline para pedidos");
+      }
+    } catch (error) {
+      toast.error("Erro ao atualizar status online");
+      console.error(error);
+    } finally {
+      setIsLoadingPedija(false);
+    }
   };
 
   return (
@@ -64,6 +140,108 @@ export default function Settings() {
             <p className="text-gray-600">Gerencie as informações da sua loja</p>
           </div>
         </div>
+
+        {/* Tipo de Negócio */}
+        {businessType && (
+          <Card className="p-6 mb-6 bg-blue-50 border-blue-200">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5" />
+              Tipo de Negócio
+            </h2>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Tipo atual:</p>
+                <p className="text-lg font-semibold text-gray-900 capitalize">
+                  {businessType === "commerce" ? "Comércio" : businessType === "services" ? "Serviços" : "Restaurante"}
+                </p>
+              </div>
+              {businessType !== "restaurant" && (
+                <Button
+                  onClick={() => handleChangeBusinessType("restaurant")}
+                  disabled={isSavingBusinessType}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {isSavingBusinessType ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Alterando...
+                    </>
+                  ) : (
+                    "Mudar para Restaurante"
+                  )}
+                </Button>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* Configurações PediJá */}
+        {businessType === "restaurant" && (
+          <Card className="p-6 mb-6 bg-green-50 border-green-200">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Toggle2 className="w-5 h-5" />
+              Configurações do PediJá
+            </h2>
+            <div className="space-y-4">
+              {pedijaSettingsQuery?.isLoading ? (
+                <div className="flex items-center justify-center p-6">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+                  <p className="text-gray-600">Carregando configurações...</p>
+                </div>
+              ) : pedijaSettings?.isOnPedija === 1 ? (
+                <>
+                  <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-green-200">
+                    <div>
+                      <p className="font-semibold text-gray-900">Status no PediJá</p>
+                      <p className="text-sm text-green-600">✓ Ativado</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-gray-200">
+                    <div>
+                      <p className="font-semibold text-gray-900">Receber Pedidos</p>
+                      <p className="text-sm text-gray-600">{isOnline ? "🟢 Online" : "🔴 Offline"}</p>
+                    </div>
+                    <Button
+                      onClick={() => handleToggleOnlineStatus(!isOnline)}
+                      disabled={isLoadingPedija}
+                      className={isOnline ? "bg-green-600 hover:bg-green-700" : "bg-gray-400 hover:bg-gray-500"}
+                    >
+                      {isLoadingPedija ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Atualizando...
+                        </>
+                      ) : isOnline ? (
+                        "Ficar Offline"
+                      ) : (
+                        "Ficar Online"
+                      )}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="p-4 bg-white rounded-lg border border-yellow-200">
+                  <p className="font-semibold text-gray-900 mb-2">Empresa não está no PediJá</p>
+                  <p className="text-sm text-gray-600 mb-4">Ative sua empresa no PediJá para começar a receber pedidos online.</p>
+                  <Button
+                    onClick={handleActivatePedija}
+                    disabled={isLoadingPedija}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isLoadingPedija ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Ativando...
+                      </>
+                    ) : (
+                      "Ativar no PediJá"
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
 
         {/* Informações da Loja */}
         <Card className="p-6 mb-6">
@@ -256,7 +434,7 @@ export default function Settings() {
         </Card>
 
         {/* Botão Salvar */}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-4">
           <Button
             onClick={handleSave}
             disabled={isSaving}
