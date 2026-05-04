@@ -54,12 +54,41 @@ export async function createContext(
         }
       }
 
-      // 3) Se ainda não achar, tenta buscar se esse usuário é dono de alguma empresa no banco compartilhado
-      // No sitbusca, a tabela companies tem um campo userId
-      if (!seller && user.email) {
-        console.log("[Auth] Step 3: Checking shared database companies for email:", user.email);
-        // Implementar busca na tabela companies se necessário, mas por enquanto vamos focar no e-mail do seller
-        console.log("[Auth] ℹ️ Shared database lookup not yet implemented for this version");
+      // 3) Se ainda não achar, buscar se esse usuário é dono de alguma empresa no banco compartilhado (companies)
+      if (!seller) {
+        console.log("[Auth] Step 3: Checking shared database companies...");
+        
+        // 3.1) Tentar por userId no banco principal
+        let company = await db.getCompanyByUserId(user.id);
+        
+        // 3.2) Se não achar por userId, tentar por email no banco principal
+        if (!company && user.email) {
+          console.log("[Auth] Company not found by userId, trying email in companies table:", user.email);
+          company = await db.getCompanyByEmail(user.email.toLowerCase().trim());
+        }
+
+        if (company) {
+          console.log("[Auth] ✓ Found company in shared database:", company.id, "name:", company.name);
+          console.log("[Auth] Creating automatic seller profile for user...");
+          
+          try {
+            // Criar perfil de seller automaticamente baseado na empresa do site
+            seller = await db.createSeller({
+              userId: user.id,
+              storeName: company.name,
+              storeDescription: company.description || "",
+              address: company.address || "",
+              phone: company.phone || "",
+              buscazapCompanyId: company.id,
+              businessType: "commerce", // Padrão inicial
+            });
+            console.log("[Auth] ✓ Successfully created and linked automatic seller profile");
+          } catch (createError) {
+            console.error("[Auth] ✗ Failed to create automatic seller profile:", createError);
+          }
+        } else {
+          console.log("[Auth] ✗ No company found in shared database for this user");
+        }
       }
 
       if (seller) {

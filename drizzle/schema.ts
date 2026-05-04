@@ -214,3 +214,24 @@ export const pedijaOrders = mysqlTable("pedija_orders", {
 
 export type PedijaOrder = typeof pedijaOrders.$inferSelect;
 export type InsertPedijaOrder = typeof pedijaOrders.$inferInsert;
+/**
+ * Tabela espelhada do banco principal (sitbusca) para permitir busca de empresas vinculadas.
+ */
+export const companies = mysqlTable("companies", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }),
+  address: text("address"),
+  phone: varchar("phone", { length: 255 }),
+  email: varchar("email", { length: 320 }),
+  status: varchar("status", { length: 50 }).default("pending").notNull(),
+  cityId: int("cityId"),
+  isActive: int("isActive").default(1).notNull(),
+  userId: int("userId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Company = typeof companies.$inferSelect;
+export type InsertCompany = typeof companies.$inferInsert;

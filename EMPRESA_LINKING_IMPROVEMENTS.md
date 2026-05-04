@@ -33,7 +33,7 @@ No sitbusca, a vinculação de empresa ocorre em duas etapas:
 - Adicionado fluxo de 3 passos com logs detalhados:
   1. **Step 1**: Buscar seller por `userId` (vínculo direto)
   2. **Step 2**: Se não encontrar, buscar por **email normalizado** (fallback - padrão sitbusca)
-  3. **Step 3**: Se ainda não encontrar, preparado para busca em banco compartilhado (futuro)
+  3. **Step 3**: Se ainda não encontrar, busca na tabela `companies` (banco compartilhado) por `userId` ou `email`. Se encontrar, **cria automaticamente** o perfil de seller no PDV.
 - Adicionado tratamento de erro robusto ao atualizar vínculo
 - Logs estruturados com símbolos visuais (✓, ✗, ℹ️) para melhor legibilidade
 - Informações completas do seller (ID e storeName) nos logs
@@ -132,6 +132,7 @@ As mudanças seguem o mesmo padrão do sitbusca:
 
 ## Arquivos Modificados
 
-- `server/_core/context.ts`: Melhorias na resolução de seller e normalização de email
+- `server/_core/context.ts`: Implementação do Step 3 (busca em banco compartilhado) e criação automática de seller
 - `server/_core/oauth.ts`: Melhorias no callback OAuth, auto-linking e normalização de email
-- `server/db.ts`: Correção na função `getSellerByEmail` para ser mais resiliente e normalização no `upsertUser`
+- `server/db.ts`: Adição de funções de busca na tabela `companies` (`getCompanyByEmail`, `getCompanyByUserId`)
+- `drizzle/schema.ts`: Adição da definição da tabela `companies` espelhada do banco principal

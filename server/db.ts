@@ -1,6 +1,6 @@
 import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, sellers, Seller, InsertSeller, products, InsertProduct, customers, Customer, InsertCustomer, orders, Order, InsertOrder, orderItems, OrderItem, stock, Stock, transactions, Transaction, pedijaOrders, InsertPedijaOrder, PedijaOrder } from "../drizzle/schema";
+import { InsertUser, users, sellers, Seller, InsertSeller, products, InsertProduct, customers, Customer, InsertCustomer, orders, Order, InsertOrder, orderItems, OrderItem, stock, Stock, transactions, Transaction, pedijaOrders, InsertPedijaOrder, PedijaOrder, companies, Company } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { BusinessType } from "../shared/businessTypes";
 
@@ -250,6 +250,20 @@ export async function getSellerByBuscazapCompanyId(buscazapCompanyId: number): P
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(sellers).where(eq(sellers.buscazapCompanyId as any, buscazapCompanyId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getCompanyByEmail(email: string): Promise<Company | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(companies).where(eq(companies.email, email)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getCompanyByUserId(userId: number): Promise<Company | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(companies).where(eq(companies.userId, userId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
