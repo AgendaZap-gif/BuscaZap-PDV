@@ -98,23 +98,50 @@ export function registerOAuthRoutes(app: Express) {
         console.warn("[OAuth] Failed to parse buscazap_company_id from state");
       }
 
-      // NOVO: Se não veio ID da empresa no link, mas temos o e-mail do usuário, 
-      // tentamos buscar uma empresa que tenha esse e-mail no cadastro (padrão sitbusca)
-      if (!buscazapCompanyId && user.email) {
-        console.log(`[OAuth] No companyId in state, searching by email: ${user.email}`);
-        const sellerByEmail = await db.getSellerByEmail(user.email);
-        if (sellerByEmail) {
-          console.log(`[OAuth] Found seller by email, linking user ${user.id} to seller ${sellerByEmail.id}`);
-          await db.updateSeller(sellerByEmail.id, { userId: user.id });
+      // Tentar vincular automaticamente o seller seguindo a lógica do sitbusca
+      console.log(`[OAuth] ========== Auto-linking Seller ==========`);
+      console.log(`[OAuth] User ID: ${user.id}, Email: ${user.email}`);
+      
+      // Estratégia 1: Se veio buscazapCompanyId no state, usar esse para vincular
+      if (buscazapCompanyId) {
+        console.log(`[OAuth] Step 1: Attempting auto-link to buscazapCompanyId: ${buscazapCompanyId}`);
+        try {
+          const existingSeller = await db.getSellerByBuscazapCompanyId(buscazapCompanyId);
+          if (existingSeller) {
+            if (existingSeller.userId !== user.id) {
+              console.log(`[OAuth] ✓ Found seller ${existingSeller.id}, re-linking to user ${user.id}`);
+              await db.updateSeller(existingSeller.id, { userId: user.id });
+            } else {
+              console.log(`[OAuth] ✓ Seller already linked to user ${user.id}`);
+            }
+          } else {
+            console.log(`[OAuth] ✗ No seller found for buscazapCompanyId: ${buscazapCompanyId}`);
+          }
+        } catch (err) {
+          console.error(`[OAuth] ✗ Error linking by buscazapCompanyId:`, err);
         }
-      } else if (buscazapCompanyId) {
-        console.log(`[OAuth] Attempting auto-link to company: ${buscazapCompanyId}`);
-        const existingSeller = await db.getSellerByBuscazapCompanyId(buscazapCompanyId);
-        if (existingSeller && existingSeller.userId !== user.id) {
-          console.log(`[OAuth] Re-linking company ${buscazapCompanyId} to user ${user.id}`);
-          await db.updateSeller(existingSeller.id, { userId: user.id });
+      } else {
+        console.log(`[OAuth] Step 1: No buscazapCompanyId in state`);
+      }
+      
+      // Estratégia 2: Se não veio ID da empresa no link, mas temos o e-mail do usuário, 
+      // tentamos buscar um seller que tenha esse e-mail no cadastro (padrão sitbusca)
+      if (!buscazapCompanyId && user.email) {
+        console.log(`[OAuth] Step 2: Searching seller by email: ${user.email}`);
+        try {
+          const sellerByEmail = await db.getSellerByEmail(user.email);
+          if (sellerByEmail) {
+            console.log(`[OAuth] ✓ Found seller by email, linking user ${user.id} to seller ${sellerByEmail.id}`);
+            await db.updateSeller(sellerByEmail.id, { userId: user.id });
+          } else {
+            console.log(`[OAuth] ✗ No seller found with email: ${user.email}`);
+          }
+        } catch (err) {
+          console.error(`[OAuth] ✗ Error searching seller by email:`, err);
         }
       }
+      console.log(`[OAuth] ========== Auto-linking Complete ==========`);
+
 
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
         name: userInfo.name || "",
