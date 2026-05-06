@@ -340,8 +340,18 @@ export async function getOrdersBySellerIdWithItems(sellerId: number) {
   const db = await getDb();
   if (!db) return [];
 
+  // Selecionamos campos específicos para evitar erro 500 caso o banco de dados 
+  // de produção não tenha todas as colunas do schema mais recente (como shippingCost, etc)
   const result = await db
-    .select()
+    .select({
+      id: orders.id,
+      sellerId: orders.sellerId,
+      orderNumber: orders.orderNumber,
+      customerName: orders.customerName,
+      totalAmount: orders.totalAmount,
+      status: orders.status,
+      createdAt: orders.createdAt,
+    })
     .from(orders)
     .where(eq(orders.sellerId, sellerId))
     .orderBy(desc(orders.createdAt));
